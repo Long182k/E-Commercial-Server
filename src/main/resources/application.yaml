@@ -1,0 +1,13 @@
+ktor:
+  application:
+    modules:
+      - com.example.ApplicationKt.module
+  deployment:
+    port: 8081
+
+postgres:
+  serverName: aws-0-ap-southeast-1.pooler.supabase.com
+  portNumber: 5432
+  databaseName: postgres
+  user: postgres.wguhuxrkjlpsqozorzzk
+  password: 3uCPOueUN0TAVV4B
