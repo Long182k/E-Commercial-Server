@@ -43,4 +43,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation ("io.ktor:ktor-server-content-negotiation:2.3.0")
     implementation ("io.ktor:ktor-serialization-jackson:2.3.0")
+    implementation("io.ktor:ktor-server-swagger:2.3.0")
+    implementation("io.ktor:ktor-server-openapi:2.3.0")
+
 }

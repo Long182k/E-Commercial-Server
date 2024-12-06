@@ -11,15 +11,14 @@ import io.ktor.server.plugins.swagger.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import java.sql.Connection
-import java.sql.DriverManager
-import org.slf4j.event.*
+
 
 fun Application.configureHTTP() {
     routing {
-        swaggerUI(path = "swagger")
+        swaggerUI(path = "swagger", swaggerFile = "openapi/documentation.yaml")
     }
+
     install(DefaultHeaders) {
-        header("X-Engine", "Ktor") // will send this header with each response
+        header("X-Engine", "Ktor")
     }
 }
