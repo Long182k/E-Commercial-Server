@@ -1,13 +1,23 @@
 openapi: "3.0.3"
 info:
-  title: "My API"
-  description: "API Documentation"
+  title: "E-Commerce API"
+  description: "API Documentation for E-Commerce System"
   version: "1.0.0"
 servers:
   - url: http://localhost:8081
 tags:
   - name: Authentication
     description: Authentication endpoints for user management
+  - name: Products
+    description: Product management endpoints
+  - name: Categories
+    description: Category management endpoints
+  - name: Cart
+    description: Shopping cart management endpoints
+  - name: Orders
+    description: Order management endpoints
+
+  # Authentication endpoints
 paths:
   /auth/register:
     post:
@@ -34,22 +44,21 @@ paths:
                 name:
                   type: string
       responses:
-        '201':
+        "201":
           description: User registered successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  data:
-                    type: object
-        '400':
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
           description: Missing required fields
-        '409':
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
           description: Username or email already exists
-        '500':
+        "500":
           description: Internal server error
 
   /auth/login:
@@ -74,20 +83,684 @@ paths:
                   type: string
                   format: password
       responses:
-        '200':
+        "200":
           description: Login successful
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  data:
-                    type: object
-        '400':
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
           description: Missing email or password
-        '401':
+        "401":
           description: Invalid credentials
-        '500':
+        "500":
           description: Internal server error
+
+  # Product endpoints
+  /products:
+    post:
+      tags:
+        - Products
+      summary: Create multiple products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductRequest"
+      responses:
+        "201":
+          description: Products created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      tags:
+        - Products
+      summary: Get all products
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsResponse"
+        "404":
+          description: No products found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Get product by ID
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+        "404":
+          description: Product not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    put:
+      tags:
+        - Products
+      summary: Update product
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductRequest"
+      responses:
+        "200":
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+        "404":
+          description: Product not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      tags:
+        - Products
+      summary: Delete product
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Product deleted successfully
+        "404":
+          description: Product not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # Category endpoints
+  /categories:
+    post:
+      tags:
+        - Categories
+      summary: Create categories
+      description: Create multiple categories at once
+      operationId: createCategories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/CategoryRequest"
+            example:
+              - title: "Electronics"
+                image: "https://example.com/electronics.jpg"
+              - title: "Fashion"
+                image: "https://example.com/fashion.jpg"
+      responses:
+        "201":
+          description: Categories created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      tags:
+        - Categories
+      summary: Get all categories
+      description: Retrieve a list of all categories
+      operationId: getCategories
+      responses:
+        "200":
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoriesResponse"
+        "404":
+          description: No categories found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: Get category by ID
+      description: Retrieve a specific category by its ID
+      operationId: getCategoryById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Category ID
+      responses:
+        "200":
+          description: Category retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryResponse"
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    put:
+      tags:
+        - Categories
+      summary: Update category
+      description: Update an existing category by its ID
+      operationId: updateCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Category ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryRequest"
+      responses:
+        "200":
+          description: Category updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryResponse"
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      tags:
+        - Categories
+      summary: Delete category
+      description: Delete a category by its ID
+      operationId: deleteCategory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Category ID
+      responses:
+        "200":
+          description: Category deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # Cart endpoints
+  /cart/{userId}:
+    post:
+      tags:
+        - Cart
+      summary: Add item to cart
+      parameters:
+        - $ref: "#/components/parameters/userIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartItemRequest"
+      responses:
+        "200":
+          description: Item added to cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItemResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      tags:
+        - Cart
+      summary: Get user's cart
+      parameters:
+        - $ref: "#/components/parameters/userIdParam"
+      responses:
+        "200":
+          description: Cart items retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItemsResponse"
+        "404":
+          description: User not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /cart/{userId}/{id}:
+    put:
+      tags:
+        - Cart
+      summary: Update cart item quantity
+      parameters:
+        - $ref: "#/components/parameters/userIdParam"
+        - $ref: "#/components/parameters/idParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartItemRequest"
+      responses:
+        "200":
+          description: Cart item updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItemResponse"
+        "404":
+          description: Cart item not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      tags:
+        - Cart
+      summary: Remove item from cart
+      parameters:
+        - $ref: "#/components/parameters/userIdParam"
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: Item removed from cart successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItemResponse"
+        "404":
+          description: Cart item not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # Order endpoints
+  /orders/{userId}:
+    post:
+      tags:
+        - Orders
+      summary: Place order
+      parameters:
+        - $ref: "#/components/parameters/userIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddressRequest"
+      responses:
+        "200":
+          description: Order placed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    get:
+      tags:
+        - Orders
+      summary: Get user's orders
+      parameters:
+        - $ref: "#/components/parameters/userIdParam"
+      responses:
+        "200":
+          description: Orders retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrdersResponse"
+        "404":
+          description: User not found
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  parameters:
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    userIdParam:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+        message:
+          type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        data:
+          type: object
+
+    ProductRequest:
+      type: object
+      required:
+        - title
+        - description
+        - price
+        - image
+        - categoryId
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+        image:
+          type: string
+        categoryId:
+          type: string
+          format: uuid
+
+    ProductResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            title:
+              type: string
+            description:
+              type: string
+            price:
+              type: number
+              format: double
+            image:
+              type: string
+            categoryId:
+              type: string
+              format: uuid
+
+    ProductsResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductResponse"
+
+    CategoryRequest:
+      type: object
+      required:
+        - title
+        - image
+      properties:
+        title:
+          type: string
+          example: "Electronics"
+        image:
+          type: string
+          example: "https://example.com/electronics.jpg"
+
+    CategoryResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+          example: "Success"
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: "123e4567-e89b-12d3-a456-426614174000"
+            title:
+              type: string
+              example: "Electronics"
+            image:
+              type: string
+              example: "https://example.com/electronics.jpg"
+
+    CategoriesResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+          example: "Success"
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              title:
+                type: string
+              image:
+                type: string
+
+    CartItemRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+
+    CartItemResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            productId:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+            price:
+              type: number
+              format: double
+            imageUrl:
+              type: string
+            quantity:
+              type: integer
+            productName:
+              type: string
+
+    CartItemsResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItemResponse"
+
+    AddressRequest:
+      type: object
+      required:
+        - addressLine
+        - city
+        - state
+        - postalCode
+        - country
+      properties:
+        addressLine:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    OrderResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+
+    OrdersResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    orderId:
+                      type: string
+                      format: uuid
+                    productId:
+                      type: string
+                      format: uuid
+                    quantity:
+                      type: integer
+                    price:
+                      type: number
+                      format: double
+                    productName:
+                      type: string
+              orderDate:
+                type: string
+              status:
+                type: string
+              totalAmount:
+                type: number
+                format: double
+              userId:
+                type: string
+                format: uuid
+              address:
+                $ref: "#/components/schemas/AddressRequest"
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
