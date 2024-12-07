@@ -20,9 +20,9 @@ data class LoginRequest(
 )
 
 @Serializable
-data class SuccessResponse(
+data class SuccessResponse<T>(
     val msg: String = "Success",
-    val data: UserResponse
+    val data: T
 )
 
 @Serializable
