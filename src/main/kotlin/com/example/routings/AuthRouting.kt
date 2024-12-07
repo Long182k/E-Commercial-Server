@@ -22,7 +22,7 @@ fun Route.authRouting(userService: UserService) {
 
                 try {
                     val createdUser = userService.register(user)
-                    call.respond(HttpStatusCode.Created, SuccessResponse("User registered successfully", createdUser))
+                    call.respond(HttpStatusCode.Created, SuccessResponse<UserResponse>("User registered successfully", createdUser))
                 } catch (e: UserExistsException) {
                     call.respond(HttpStatusCode.Conflict, ErrorResponse(409, "Username or email already exists"))
                 }
