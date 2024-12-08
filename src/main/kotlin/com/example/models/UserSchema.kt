@@ -33,7 +33,7 @@ data class ErrorResponse(
 
 @Serializable
 data class UserResponse(
-    val id: String,
+    val id: Int,
     val username: String,
     val email: String,
     val name: String
@@ -43,7 +43,7 @@ class UserService(private val connection: Connection) {
     companion object {
         private const val CREATE_TABLE_USERS = """
     CREATE TABLE IF NOT EXISTS USERS (
-        ID VARCHAR(36) PRIMARY KEY,   -- UUID as primary key
+        ID SERIAL PRIMARY KEY,
         USERNAME VARCHAR(255) UNIQUE,
         EMAIL VARCHAR(255) UNIQUE,
         PASSWORD VARCHAR(255),
@@ -52,8 +52,8 @@ class UserService(private val connection: Connection) {
 """
 
         private const val INSERT_USER = """
-    INSERT INTO users (id, username, email, password, name) 
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO users (username, email, password, name) 
+    VALUES (?, ?, ?, ?) RETURNING id
 """
 
         private const val SELECT_USER_BY_CREDENTIALS = """
@@ -94,28 +94,22 @@ class UserService(private val connection: Connection) {
             // Check if user exists
             checkUserExists(user)
 
-            // Generate a UUID for the new user
-            val userId = UUID.randomUUID().toString()
-            val username = user.name  // Set username to the same value as name
-
-            // Create new user
             connection.prepareStatement(INSERT_USER).use { statement ->
-                statement.setString(1, userId)       // Set the UUID as ID
-                statement.setString(2, username)    // Set username
-                statement.setString(3, user.email)  // Set email
-                statement.setString(4, user.password) // Set password
-                statement.setString(5, user.name)   // Set name
+                statement.setString(1, user.name)    // username
+                statement.setString(2, user.email)   // email
+                statement.setString(3, user.password) // password
+                statement.setString(4, user.name)    // name
 
-                statement.executeUpdate()
+                val resultSet = statement.executeQuery()
+                resultSet.next()
+                val userId = resultSet.getInt("id")
 
-                val newUser = UserResponse(
-                    id = userId,     // Use the generated UUID
-                    username = username,
+                return@withContext UserResponse(
+                    id = userId,
+                    username = user.name,
                     email = user.email,
                     name = user.name
                 )
-
-                return@withContext newUser
             }
         } catch (e: Exception) {
             println("Registration error: ${e.message}")
@@ -142,7 +136,7 @@ class UserService(private val connection: Connection) {
 
                 if (resultSet.next()) {
                     val user = UserResponse(
-                        id = resultSet.getString("id"),
+                        id = resultSet.getInt("id"),
                         username = resultSet.getString("username"),
                         email = resultSet.getString("email"),
                         name = resultSet.getString("name")

@@ -41,7 +41,8 @@ fun Route.productRouting(productService: ProductService) {
 
         get("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toInt() 
+                    ?: throw IllegalArgumentException("Invalid ID")
                 try {
                     val product = productService.getProductById(id)
                     call.respond(HttpStatusCode.OK, SuccessResponse("Product retrieved successfully", product))
@@ -55,7 +56,8 @@ fun Route.productRouting(productService: ProductService) {
 
         put("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toInt()
+                    ?: throw IllegalArgumentException("Invalid ID")
                 val rawBody = call.receiveText()
                 val product = Json.decodeFromString<Product>(rawBody)
 
@@ -72,7 +74,8 @@ fun Route.productRouting(productService: ProductService) {
 
         delete("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toInt()
+                    ?: throw IllegalArgumentException("Invalid ID")
                 try {
                     productService.deleteProduct(id)
                     call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Product deleted successfully", Unit))
@@ -81,6 +84,23 @@ fun Route.productRouting(productService: ProductService) {
                 }
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
+            }
+        }
+
+        get("/category/{categoryId}") {
+            try {
+                val categoryId = call.parameters["categoryId"]?.toInt()
+                    ?: throw IllegalArgumentException("Invalid category ID")
+                val products = productService.getProductsByCategory(categoryId)
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf("msg" to "Products retrieved successfully", "data" to products)
+                )
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to (e.message ?: "Failed to get products"))
+                )
             }
         }
     }

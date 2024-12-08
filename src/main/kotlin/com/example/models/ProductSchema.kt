@@ -7,11 +7,12 @@ import java.util.UUID
 
 @Serializable
 data class Product(
+    val id: Int? = null,
     val title: String,
-    val description: String,
     val price: Double,
-    val image: String,
-    val categoryId: String
+    val description: String,
+    val categoryId: Int,
+    val image: String
 )
 
 @Serializable
@@ -28,45 +29,46 @@ class ProductService(private val connection: Connection) {
     companion object {
         private const val CREATE_TABLE_PRODUCTS = """
             CREATE TABLE IF NOT EXISTS PRODUCTS (
-                ID VARCHAR(36) PRIMARY KEY,
+                ID SERIAL PRIMARY KEY,
                 TITLE VARCHAR(255) NOT NULL,
+                PRICE DECIMAL(10,2) NOT NULL,
                 DESCRIPTION TEXT,
-                PRICE DOUBLE PRECISION NOT NULL,
-                IMAGE TEXT,
-                CATEGORY_ID VARCHAR(36) REFERENCES CATEGORIES(ID)
+                CATEGORY_ID INT REFERENCES CATEGORIES(ID),
+                IMAGE VARCHAR(255)
             );
         """
 
         private const val INSERT_PRODUCT = """
-            INSERT INTO products (id, title, description, price, image, category_id) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO products (title, price, description, category_id, image) 
+            VALUES (?, ?, ?, ?, ?) RETURNING id
         """
 
-        private const val SELECT_ALL_PRODUCTS = "SELECT * FROM products"
-        private const val SELECT_PRODUCT_BY_ID = "SELECT * FROM products WHERE id = ?"
+        private const val SELECT_PRODUCT_BY_ID = """
+            SELECT * FROM products WHERE id = ?
+        """
+
+        private const val SELECT_PRODUCTS_BY_CATEGORY = """
+            SELECT * FROM products WHERE category_id = ?
+        """
+
         private const val UPDATE_PRODUCT = """
             UPDATE products 
-            SET title = ?, description = ?, price = ?, image = ?, category_id = ?
+            SET title = ?, price = ?, description = ?, category_id = ?, image = ?
             WHERE id = ?
+            RETURNING *
         """
-        private const val DELETE_PRODUCT = "DELETE FROM products WHERE id = ?"
+
+        private const val DELETE_PRODUCT = """
+            DELETE FROM products 
+            WHERE id = ?
+            RETURNING *
+        """
     }
 
     init {
-        try {
-            // First verify that the Categories table exists
-            connection.createStatement().use { statement ->
-                statement.executeQuery("SELECT 1 FROM categories LIMIT 1")
-            }
-            
-            // Then create the Products table
-            connection.createStatement().use { statement ->
-                statement.execute(CREATE_TABLE_PRODUCTS)
-                println("Products table created or verified successfully")
-            }
-        } catch (e: Exception) {
-            println("Database initialization error: ${e.message}")
-            throw e
+        connection.createStatement().use { statement ->
+            statement.execute(CREATE_TABLE_PRODUCTS)
+            println("Products table created or verified successfully")
         }
     }
 
@@ -78,12 +80,11 @@ class ProductService(private val connection: Connection) {
                 for (product in products) {
                     val productId = UUID.randomUUID().toString()
                     
-                    statement.setString(1, productId)
-                    statement.setString(2, product.title)
+                    statement.setString(1, product.title)
+                    statement.setDouble(2, product.price)
                     statement.setString(3, product.description)
-                    statement.setDouble(4, product.price)
+                    statement.setInt(4, product.categoryId)
                     statement.setString(5, product.image)
-                    statement.setString(6, product.categoryId)
                     statement.addBatch()
 
                     responses.add(
@@ -93,7 +94,7 @@ class ProductService(private val connection: Connection) {
                             description = product.description,
                             price = product.price,
                             image = product.image,
-                            categoryId = product.categoryId
+                            categoryId = product.categoryId.toString()
                         )
                     )
                 }
@@ -107,7 +108,7 @@ class ProductService(private val connection: Connection) {
 
     suspend fun getProducts(): List<ProductResponse> = withContext(Dispatchers.IO) {
         try {
-            connection.prepareStatement(SELECT_ALL_PRODUCTS).use { statement ->
+            connection.prepareStatement(SELECT_PRODUCT_BY_ID).use { statement ->
                 val resultSet = statement.executeQuery()
                 val products = mutableListOf<ProductResponse>()
 
@@ -130,20 +131,20 @@ class ProductService(private val connection: Connection) {
         }
     }
 
-    suspend fun getProductById(id: String): ProductResponse = withContext(Dispatchers.IO) {
+    suspend fun getProductById(id: Int): Product = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(SELECT_PRODUCT_BY_ID).use { statement ->
-                statement.setString(1, id)
+                statement.setInt(1, id)
                 val resultSet = statement.executeQuery()
 
                 if (resultSet.next()) {
-                    return@withContext ProductResponse(
-                        id = resultSet.getString("id"),
+                    return@withContext Product(
+                        id = resultSet.getInt("id"),
                         title = resultSet.getString("title"),
-                        description = resultSet.getString("description"),
                         price = resultSet.getDouble("price"),
-                        image = resultSet.getString("image"),
-                        categoryId = resultSet.getString("category_id")
+                        description = resultSet.getString("description"),
+                        categoryId = resultSet.getInt("category_id"),
+                        image = resultSet.getString("image")
                     )
                 } else {
                     throw ProductNotFoundException()
@@ -157,29 +158,55 @@ class ProductService(private val connection: Connection) {
         }
     }
 
-    suspend fun updateProduct(id: String, product: Product): ProductResponse = withContext(Dispatchers.IO) {
+    suspend fun getProductsByCategory(categoryId: Int): List<Product> = withContext(Dispatchers.IO) {
+        try {
+            connection.prepareStatement(SELECT_PRODUCTS_BY_CATEGORY).use { statement ->
+                statement.setInt(1, categoryId)
+                val resultSet = statement.executeQuery()
+                val products = mutableListOf<Product>()
+
+                while (resultSet.next()) {
+                    products.add(
+                        Product(
+                            id = resultSet.getInt("id"),
+                            title = resultSet.getString("title"),
+                            price = resultSet.getDouble("price"),
+                            description = resultSet.getString("description"),
+                            categoryId = resultSet.getInt("category_id"),
+                            image = resultSet.getString("image")
+                        )
+                    )
+                }
+                return@withContext products
+            }
+        } catch (e: Exception) {
+            throw Exception("Failed to get products: ${e.message}")
+        }
+    }
+
+    suspend fun updateProduct(id: Int, product: Product): ProductResponse = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(UPDATE_PRODUCT).use { statement ->
                 statement.setString(1, product.title)
-                statement.setString(2, product.description)
-                statement.setDouble(3, product.price)
-                statement.setString(4, product.image)
-                statement.setString(5, product.categoryId)
-                statement.setString(6, id)
+                statement.setDouble(2, product.price)
+                statement.setString(3, product.description)
+                statement.setInt(4, product.categoryId)
+                statement.setString(5, product.image)
+                statement.setInt(6, id)
 
-                val rowsUpdated = statement.executeUpdate()
-                if (rowsUpdated == 0) {
+                val resultSet = statement.executeQuery()
+                if (resultSet.next()) {
+                    return@withContext ProductResponse(
+                        id = resultSet.getInt("id").toString(),
+                        title = resultSet.getString("title"),
+                        description = resultSet.getString("description"),
+                        price = resultSet.getDouble("price"),
+                        image = resultSet.getString("image"),
+                        categoryId = resultSet.getInt("category_id").toString()
+                    )
+                } else {
                     throw ProductNotFoundException()
                 }
-
-                return@withContext ProductResponse(
-                    id = id,
-                    title = product.title,
-                    description = product.description,
-                    price = product.price,
-                    image = product.image,
-                    categoryId = product.categoryId
-                )
             }
         } catch (e: Exception) {
             when (e) {
@@ -189,12 +216,13 @@ class ProductService(private val connection: Connection) {
         }
     }
 
-    suspend fun deleteProduct(id: String) = withContext(Dispatchers.IO) {
+    suspend fun deleteProduct(id: Int) = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(DELETE_PRODUCT).use { statement ->
-                statement.setString(1, id)
-                val rowsDeleted = statement.executeUpdate()
-                if (rowsDeleted == 0) {
+                statement.setInt(1, id)
+                val resultSet = statement.executeQuery()
+
+                if (!resultSet.next()) {
                     throw ProductNotFoundException()
                 }
             }

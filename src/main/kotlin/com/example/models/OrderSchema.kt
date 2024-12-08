@@ -9,32 +9,32 @@ import java.time.format.DateTimeFormatter
 
 @Serializable
 data class Address(
-    val addressLine: String,
+    val id: Int? = null,
+    val street: String,
     val city: String,
     val state: String,
-    val postalCode: String,
+    val zipCode: String,
     val country: String
 )
 
 @Serializable
 data class OrderItem(
-    val id: String,
-    val orderId: String,
-    val productId: String,
+    val id: Int? = null,
+    val orderId: Int? = null,
+    val productId: Int,
     val quantity: Int,
-    val price: Double,
-    val productName: String
+    val price: Double
 )
 
 @Serializable
 data class Order(
-    val id: String = UUID.randomUUID().toString(),
+    val id: Int? = null,
+    val userId: Int,
     val items: List<OrderItem>,
-    val orderDate: String,
+    val total: Double,
     val status: String,
-    val totalAmount: Double,
-    val userId: String,
-    val address: Address
+    val address: Address,
+    val createdAt: String? = null
 )
 
 class OrderService(
@@ -44,46 +44,58 @@ class OrderService(
     companion object {
         private const val CREATE_TABLE_ORDERS = """
             CREATE TABLE IF NOT EXISTS ORDERS (
-                ID VARCHAR(36) PRIMARY KEY,
-                USER_ID VARCHAR(36) REFERENCES USERS(ID),
-                ORDER_DATE TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                STATUS VARCHAR(50),
-                TOTAL_AMOUNT DOUBLE PRECISION,
-                ADDRESS_LINE TEXT,
-                CITY VARCHAR(255),
-                STATE VARCHAR(255),
-                POSTAL_CODE VARCHAR(20),
-                COUNTRY VARCHAR(255)
+                ID SERIAL PRIMARY KEY,
+                USER_ID INT REFERENCES USERS(ID),
+                TOTAL DECIMAL(10,2) NOT NULL,
+                STATUS VARCHAR(50) NOT NULL,
+                CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """
 
         private const val CREATE_TABLE_ORDER_ITEMS = """
             CREATE TABLE IF NOT EXISTS ORDER_ITEMS (
-                ID VARCHAR(36) PRIMARY KEY,
-                ORDER_ID VARCHAR(36) REFERENCES ORDERS(ID),
-                PRODUCT_ID VARCHAR(36) REFERENCES PRODUCTS(ID),
-                QUANTITY INT,
-                PRICE DOUBLE PRECISION,
-                PRODUCT_NAME VARCHAR(255)
+                ID SERIAL PRIMARY KEY,
+                ORDER_ID INT REFERENCES ORDERS(ID),
+                PRODUCT_ID INT REFERENCES PRODUCTS(ID),
+                QUANTITY INT NOT NULL,
+                PRICE DECIMAL(10,2) NOT NULL
+            );
+        """
+
+        private const val CREATE_TABLE_ADDRESSES = """
+            CREATE TABLE IF NOT EXISTS ADDRESSES (
+                ID SERIAL PRIMARY KEY,
+                ORDER_ID INT REFERENCES ORDERS(ID),
+                STREET VARCHAR(255) NOT NULL,
+                CITY VARCHAR(255) NOT NULL,
+                STATE VARCHAR(255) NOT NULL,
+                ZIP_CODE VARCHAR(20) NOT NULL,
+                COUNTRY VARCHAR(255) NOT NULL
             );
         """
 
         private const val INSERT_ORDER = """
-            INSERT INTO orders (id, user_id, status, total_amount, address_line, city, state, postal_code, country) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO orders (user_id, total, status) 
+            VALUES (?, ?, ?) RETURNING id
         """
 
         private const val INSERT_ORDER_ITEM = """
-            INSERT INTO order_items (id, order_id, product_id, quantity, price, product_name) 
+            INSERT INTO order_items (order_id, product_id, quantity, price) 
+            VALUES (?, ?, ?, ?)
+        """
+
+        private const val INSERT_ADDRESS = """
+            INSERT INTO addresses (order_id, street, city, state, zip_code, country) 
             VALUES (?, ?, ?, ?, ?, ?)
         """
 
         private const val SELECT_ORDERS_BY_USER = """
-            SELECT o.*, oi.* 
-            FROM orders o 
-            LEFT JOIN order_items oi ON o.id = oi.order_id 
+            SELECT o.*, a.*, oi.*
+            FROM orders o
+            LEFT JOIN addresses a ON o.id = a.order_id
+            LEFT JOIN order_items oi ON o.id = oi.order_id
             WHERE o.user_id = ?
-            ORDER BY o.order_date DESC
+            ORDER BY o.created_at DESC
         """
     }
 
@@ -91,113 +103,127 @@ class OrderService(
         connection.createStatement().use { statement ->
             statement.execute(CREATE_TABLE_ORDERS)
             statement.execute(CREATE_TABLE_ORDER_ITEMS)
+            statement.execute(CREATE_TABLE_ADDRESSES)
             println("Orders tables created or verified successfully")
         }
     }
 
-    suspend fun placeOrder(userId: String, address: Address): String = withContext(Dispatchers.IO) {
+    suspend fun placeOrder(userId: Int, address: Address): Order = withContext(Dispatchers.IO) {
         try {
+            // Get cart items
             val cartItems = cartService.getCartByUserId(userId)
-            if (cartItems.isEmpty()) throw Exception("Cart is empty")
+            if (cartItems.isEmpty()) {
+                throw Exception("Cart is empty")
+            }
 
-            val orderId = UUID.randomUUID().toString()
-            val totalAmount = cartItems.sumOf { it.price * it.quantity }
+            // Calculate total
+            val total = cartItems.sumOf { it.price * it.quantity }
 
-            connection.autoCommit = false
-            try {
-                // Insert order
-                connection.prepareStatement(INSERT_ORDER).use { statement ->
-                    statement.setString(1, orderId)
-                    statement.setString(2, userId)
-                    statement.setString(3, "PENDING")
-                    statement.setDouble(4, totalAmount)
-                    statement.setString(5, address.addressLine)
-                    statement.setString(6, address.city)
-                    statement.setString(7, address.state)
-                    statement.setString(8, address.postalCode)
-                    statement.setString(9, address.country)
-                    statement.executeUpdate()
-                }
+            connection.prepareStatement(INSERT_ORDER).use { statement ->
+                statement.setInt(1, userId)
+                statement.setDouble(2, total)
+                statement.setString(3, "PENDING")
+
+                val resultSet = statement.executeQuery()
+                resultSet.next()
+                val orderId = resultSet.getInt("id")
+
+                // Insert address
+                insertAddress(orderId, address)
 
                 // Insert order items
-                connection.prepareStatement(INSERT_ORDER_ITEM).use { statement ->
-                    for (item in cartItems) {
-                        statement.setString(1, UUID.randomUUID().toString())
-                        statement.setString(2, orderId)
-                        statement.setString(3, item.productId)
-                        statement.setInt(4, item.quantity)
-                        statement.setDouble(5, item.price)
-                        statement.setString(6, item.productName)
-                        statement.executeUpdate()
-                    }
+                val orderItems = cartItems.map { cartItem ->
+                    insertOrderItem(orderId, cartItem)
                 }
 
-                // Clear cart items
-                cartItems.forEach { cartService.deleteCartItem(userId, it.id) }
-
-                connection.commit()
-                return@withContext orderId
-            } catch (e: Exception) {
-                connection.rollback()
-                throw e
-            } finally {
-                connection.autoCommit = true
+                return@withContext Order(
+                    id = orderId,
+                    userId = userId,
+                    items = orderItems,
+                    total = total,
+                    status = "PENDING",
+                    address = address,
+                    createdAt = resultSet.getString("created_at")
+                )
             }
         } catch (e: Exception) {
             throw Exception("Failed to place order: ${e.message}")
         }
     }
 
-    suspend fun getOrdersByUserId(userId: String): List<Order> = withContext(Dispatchers.IO) {
+    private suspend fun insertAddress(orderId: Int, address: Address) {
+        connection.prepareStatement(INSERT_ADDRESS).use { statement ->
+            statement.setInt(1, orderId)
+            statement.setString(2, address.street)
+            statement.setString(3, address.city)
+            statement.setString(4, address.state)
+            statement.setString(5, address.zipCode)
+            statement.setString(6, address.country)
+            statement.executeUpdate()
+        }
+    }
+
+    private suspend fun insertOrderItem(orderId: Int, cartItem: CartItemResponse): OrderItem {
+        connection.prepareStatement(INSERT_ORDER_ITEM).use { statement ->
+            statement.setInt(1, orderId)
+            statement.setInt(2, cartItem.productId)
+            statement.setInt(3, cartItem.quantity)
+            statement.setDouble(4, cartItem.price)
+            statement.executeUpdate()
+
+            return OrderItem(
+                orderId = orderId,
+                productId = cartItem.productId,
+                quantity = cartItem.quantity,
+                price = cartItem.price
+            )
+        }
+    }
+
+    suspend fun getOrdersByUserId(userId: Int): List<Order> = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(SELECT_ORDERS_BY_USER).use { statement ->
-                statement.setString(1, userId)
+                statement.setInt(1, userId)
                 val resultSet = statement.executeQuery()
                 
-                val orders = mutableMapOf<String, MutableList<OrderItem>>()
-                val orderDetails = mutableMapOf<String, Triple<String, Double, Address>>()
-
+                val orders = mutableMapOf<Int, Order>()
+                
                 while (resultSet.next()) {
-                    val orderId = resultSet.getString("id")
+                    val orderId = resultSet.getInt("id")
                     
-                    if (!orderDetails.containsKey(orderId)) {
-                        orderDetails[orderId] = Triple(
-                            resultSet.getTimestamp("order_date").toString(),
-                            resultSet.getDouble("total_amount"),
-                            Address(
-                                addressLine = resultSet.getString("address_line"),
+                    if (!orders.containsKey(orderId)) {
+                        orders[orderId] = Order(
+                            id = orderId,
+                            userId = resultSet.getInt("user_id"),
+                            total = resultSet.getDouble("total"),
+                            status = resultSet.getString("status"),
+                            items = mutableListOf(),
+                            address = Address(
+                                street = resultSet.getString("street"),
                                 city = resultSet.getString("city"),
                                 state = resultSet.getString("state"),
-                                postalCode = resultSet.getString("postal_code"),
+                                zipCode = resultSet.getString("zip_code"),
                                 country = resultSet.getString("country")
-                            )
+                            ),
+                            createdAt = resultSet.getString("created_at")
                         )
                     }
-
-                    val orderItem = OrderItem(
-                        id = resultSet.getString("id"),
-                        orderId = orderId,
-                        productId = resultSet.getString("product_id"),
-                        quantity = resultSet.getInt("quantity"),
-                        price = resultSet.getDouble("price"),
-                        productName = resultSet.getString("product_name")
-                    )
-
-                    orders.getOrPut(orderId) { mutableListOf() }.add(orderItem)
+                    
+                    // Add order item
+                    val orderItemId = resultSet.getInt("id")
+                    if (orderItemId > 0) {
+                        val orderItem = OrderItem(
+                            id = orderItemId,
+                            orderId = orderId,
+                            productId = resultSet.getInt("product_id"),
+                            quantity = resultSet.getInt("quantity"),
+                            price = resultSet.getDouble("price")
+                        )
+                        (orders[orderId]?.items as MutableList).add(orderItem)
+                    }
                 }
-
-                return@withContext orders.map { (orderId, items) ->
-                    val (orderDate, totalAmount, address) = orderDetails[orderId]!!
-                    Order(
-                        id = orderId,
-                        items = items,
-                        orderDate = orderDate,
-                        status = "PENDING",
-                        totalAmount = totalAmount,
-                        userId = userId,
-                        address = address
-                    )
-                }
+                
+                return@withContext orders.values.toList()
             }
         } catch (e: Exception) {
             throw Exception("Failed to get orders: ${e.message}")

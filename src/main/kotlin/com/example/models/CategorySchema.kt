@@ -7,6 +7,7 @@ import java.util.UUID
 
 @Serializable
 data class Category(
+    val id: Int? = null,
     val title: String,
     val image: String
 )
@@ -22,19 +23,24 @@ class CategoryService(private val connection: Connection) {
     companion object {
         private const val CREATE_TABLE_CATEGORIES = """
             CREATE TABLE IF NOT EXISTS CATEGORIES (
-                ID VARCHAR(36) PRIMARY KEY,
+                ID SERIAL PRIMARY KEY,
                 TITLE VARCHAR(255) NOT NULL,
-                IMAGE TEXT
+                IMAGE VARCHAR(255)
             );
         """
 
         private const val INSERT_CATEGORY = """
-            INSERT INTO categories (id, title, image) 
-            VALUES (?, ?, ?)
+            INSERT INTO categories (title, image) 
+            VALUES (?, ?) RETURNING id
         """
 
-        private const val SELECT_ALL_CATEGORIES = "SELECT * FROM categories"
-        private const val SELECT_CATEGORY_BY_ID = "SELECT * FROM categories WHERE id = ?"
+        private const val SELECT_ALL_CATEGORIES = """
+            SELECT * FROM categories
+        """
+
+        private const val SELECT_CATEGORY_BY_ID = """
+            SELECT * FROM categories WHERE id = ?
+        """
         private const val UPDATE_CATEGORY = """
             UPDATE categories 
             SET title = ?, image = ?
@@ -63,9 +69,8 @@ class CategoryService(private val connection: Connection) {
                 for (category in categories) {
                     val categoryId = UUID.randomUUID().toString()
                     
-                    statement.setString(1, categoryId)
-                    statement.setString(2, category.title)
-                    statement.setString(3, category.image)
+                    statement.setString(1, category.title)
+                    statement.setString(2, category.image)
                     statement.addBatch()
 
                     responses.add(
