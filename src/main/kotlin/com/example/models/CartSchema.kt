@@ -128,7 +128,7 @@ class CartService(private val connection: Connection, private val productService
         }
     }
 
-    suspend fun updateCartQuantity(userId: Int, cartId: Int, quantity: Int): CartItemResponse = withContext(Dispatchers.IO) {
+    suspend fun updateCartQuantity(userId: Int, cartId: Int, quantity: Int): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(UPDATE_CART_QUANTITY).use { statement ->
                 statement.setInt(1, quantity)
@@ -138,8 +138,11 @@ class CartService(private val connection: Connection, private val productService
                 val rowsUpdated = statement.executeUpdate()
                 if (rowsUpdated == 0) throw CartItemNotFoundException()
 
+                val updatedCartItem = getCartByUserId(userId).first { it.id == cartId }
+
+
                 // Get updated cart item
-                return@withContext getCartByUserId(userId).first { it.id == cartId }
+                return@withContext listOf(updatedCartItem)
             }
         } catch (e: Exception) {
             when (e) {
@@ -149,7 +152,7 @@ class CartService(private val connection: Connection, private val productService
         }
     }
 
-    suspend fun deleteCartItem(userId: Int, cartId: Int): CartItemResponse = withContext(Dispatchers.IO) {
+    suspend fun deleteCartItem(userId: Int, cartId: Int): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
             // Get cart item before deletion
             val cartItem = getCartByUserId(userId).firstOrNull { it.id == cartId }
@@ -162,7 +165,7 @@ class CartService(private val connection: Connection, private val productService
                 val rowsDeleted = statement.executeUpdate()
                 if (rowsDeleted == 0) throw CartItemNotFoundException()
 
-                return@withContext cartItem
+                return@withContext listOf(cartItem)
             }
         } catch (e: Exception) {
             when (e) {

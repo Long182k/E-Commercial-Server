@@ -38,12 +38,39 @@ data class Order(
 @Serializable
 data class OrderResponse(
     val id: Int,
-    val items: List<OrderItem>,
+    val items: List<OrderItemResponse>,
     val orderDate: String? = null,
     val status: String,
     val totalAmount: Double,
     val userId: Int,
     val address: Address,
+)
+
+@Serializable
+data class OrderItemResponse(
+    val id: Int,
+    val orderId: Int,
+    val productId: Int,
+    val quantity: Int,
+    val price: Double,
+    val userId: Int,
+    val productName: String
+)
+
+@Serializable
+data class Summary(
+    val discount: Double,
+    val items: List<CartItemResponse>,
+    val shipping: Double,
+    val subtotal: Double,
+    val tax: Double,
+    val total: Double
+)
+
+@Serializable
+data class CheckoutResponse(
+    val data: Summary,
+    val msg: String
 )
 
 class OrderService(
@@ -101,16 +128,18 @@ class OrderService(
         """
 
         private const val SELECT_ORDERS_BY_USER = """
-            SELECT 
-                o.id, o.user_id, o.total_amount, o.status, o.order_date,
-                a.id as address_id, a.address_line, a.city, a.state, a.postal_code, a.country,
-                oi.product_id, oi.quantity, oi.price
-            FROM orders o
-            LEFT JOIN addresses a ON o.id = a.order_id
-            LEFT JOIN order_items oi ON o.id = oi.order_id
-            WHERE o.user_id = ?
-            ORDER BY o.order_date DESC
-        """
+        SELECT 
+            o.id, o.user_id, o.total_amount, o.status, o.order_date,
+            a.id as address_id, a.address_line, a.city, a.state, a.postal_code, a.country,
+            oi.id as order_item_id, oi.product_id, oi.quantity, oi.price,
+            p.title as product_name
+        FROM orders o
+        LEFT JOIN addresses a ON o.id = a.order_id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE o.user_id = ?
+        ORDER BY o.order_date DESC
+    """
     }
 
     init {
@@ -221,7 +250,7 @@ class OrderService(
                                 country = resultSet.getString("country")
                             )
                         } else {
-                            // Provide a default address or null if your OrderResponse allows it
+                            // Provide a default address
                             Address(
                                 addressLine = "",
                                 city = "",
@@ -245,13 +274,17 @@ class OrderService(
                     // Add order item if it exists
                     val productId = resultSet.getInt("product_id")
                     if (!resultSet.wasNull()) {
-                        val orderItem = OrderItem(
+                        val orderItem = OrderItemResponse(
+                            id = resultSet.getInt("order_item_id"),
                             orderId = orderId,
                             productId = productId,
                             quantity = resultSet.getInt("quantity"),
-                            price = resultSet.getDouble("price")
+                            price = resultSet.getDouble("price"),
+                            userId = resultSet.getInt("user_id"),
+                            productName = resultSet.getString("product_name")
                         )
                         (orders[orderId]?.items as MutableList).add(orderItem)
+                        println("Added order item: $orderItem")
                     }
                 }
 
@@ -261,6 +294,38 @@ class OrderService(
             println("Error fetching orders: ${e.message}")
             e.printStackTrace()
             throw Exception("Failed to get orders: ${e.message}")
+        }
+    }
+
+    suspend fun getCheckoutSummary(userId: Int): CheckoutResponse {
+        try {
+            // Get cart items
+            val cartItems = cartService.getCartByUserId(userId)
+            
+            // Calculate subtotal
+            val subtotal = cartItems.sumOf { it.price * it.quantity }
+            
+            // Calculate other fees
+            val tax = subtotal * 0.1  // 10% tax
+            val shipping = if (subtotal > 1000) 0.0 else 50.0  // Free shipping over $1000
+            val discount = if (subtotal > 2000) subtotal * 0.05 else 0.0  // 5% discount over $2000
+            
+            // Calculate total
+            val total = subtotal + tax + shipping - discount
+
+            return CheckoutResponse(
+                data = Summary(
+                    discount = discount,
+                    items = cartItems,
+                    shipping = shipping,
+                    subtotal = subtotal,
+                    tax = tax,
+                    total = total
+                ),
+                msg = "Checkout summary retrieved successfully"
+            )
+        } catch (e: Exception) {
+            throw Exception("Failed to get checkout summary: ${e.message}")
         }
     }
 } 

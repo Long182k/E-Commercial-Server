@@ -40,5 +40,20 @@ fun Route.orderRouting(orderService: OrderService) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
             }
         }
+
+        get("/checkout/{userId}") {
+            try {
+                val userId = call.parameters["userId"]?.toIntOrNull() 
+                    ?: throw IllegalArgumentException("Invalid user ID")
+                
+                val response = orderService.getCheckoutSummary(userId)
+                call.respond(HttpStatusCode.OK, response)
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(400, e.message ?: "Unknown error")
+                )
+            }
+        }
     }
 } 
