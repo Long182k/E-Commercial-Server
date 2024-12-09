@@ -63,7 +63,7 @@ class CartService(private val connection: Connection, private val productService
         }
     }
 
-    suspend fun addToCart(userId: Int, cartItem: CartItem): CartItemResponse = withContext(Dispatchers.IO) {
+    suspend fun addToCart(userId: Int, cartItem: CartItem):  List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
             val product = productService.getProductById(cartItem.productId)
             
@@ -76,7 +76,7 @@ class CartService(private val connection: Connection, private val productService
                 resultSet.next()
                 val cartId = resultSet.getInt("id")
 
-                return@withContext CartItemResponse(
+                val cartItemResponse = CartItemResponse(
                     id = cartId,
                     productId = cartItem.productId,
                     userId = userId,
@@ -85,6 +85,8 @@ class CartService(private val connection: Connection, private val productService
                     quantity = cartItem.quantity,
                     productName = product.title
                 )
+
+                return@withContext listOf(cartItemResponse)
             }
         } catch (e: Exception) {
             throw Exception("Failed to add item to cart: ${e.message}")
@@ -93,14 +95,16 @@ class CartService(private val connection: Connection, private val productService
 
     suspend fun getCartByUserId(userId: Int): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
+            println("Fetching cart for userId: $userId")
             connection.prepareStatement(SELECT_CART_BY_USER).use { statement ->
                 statement.setInt(1, userId)
                 val resultSet = statement.executeQuery()
                 val cartItems = mutableListOf<CartItemResponse>()
 
                 while (resultSet.next()) {
-                    cartItems.add(
-                        CartItemResponse(
+                    println("Processing row...")
+                    try {
+                        val item = CartItemResponse(
                             id = resultSet.getInt("id"),
                             productId = resultSet.getInt("product_id"),
                             userId = resultSet.getInt("user_id"),
@@ -109,11 +113,17 @@ class CartService(private val connection: Connection, private val productService
                             quantity = resultSet.getInt("quantity"),
                             productName = resultSet.getString("product_name")
                         )
-                    )
+                        cartItems.add(item)
+                        println("Added item to cart: $item")
+                    } catch (e: Exception) {
+                        println("Error processing row: ${e.message}")
+                    }
                 }
+                println("Final cart items count: ${cartItems.size}")
                 return@withContext cartItems
             }
         } catch (e: Exception) {
+            println("Error fetching cart: ${e.message}")
             throw Exception("Failed to get cart items: ${e.message}")
         }
     }

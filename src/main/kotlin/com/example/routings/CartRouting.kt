@@ -16,32 +16,27 @@ fun Route.cartRouting(cartService: CartService) {
                     ?: throw IllegalArgumentException("Invalid user ID")
                 val cartItem = call.receive<CartItem>()
                 val response = cartService.addToCart(userId, cartItem)
-                call.respond(
-                    HttpStatusCode.Created,
-                    mapOf("msg" to "Item added to cart successfully", "data" to response)
-                )
+                call.respond(HttpStatusCode.OK, SuccessResponse("Item added to cart successfully", response))
+
             } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to (e.message ?: "Failed to add item to cart"))
-                )
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, e.message ?: "Failed to add item to cart"))
+
             }
         }
 
         get("/{userId}") {
             try {
-                val userId = call.parameters["userId"]?.toInt()
+                val userId = call.parameters["userId"]?.toIntOrNull()
                     ?: throw IllegalArgumentException("Invalid user ID")
+                println("userId: $userId")
                 val cartItems = cartService.getCartByUserId(userId)
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf("msg" to "Cart items retrieved successfully", "data" to cartItems)
-                )
+                println("cartItems: $cartItems")
+
+                call.respond(HttpStatusCode.OK, SuccessResponse("Cart items retrieved successfully", cartItems))
+
             } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to (e.message ?: "Failed to get cart items"))
-                )
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
+
             }
         }
 
@@ -55,15 +50,11 @@ fun Route.cartRouting(cartService: CartService) {
                     ?: throw IllegalArgumentException("Invalid quantity")
                 
                 val updatedItem = cartService.updateCartQuantity(userId, cartId, quantity)
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf("msg" to "Cart item updated successfully", "data" to updatedItem)
-                )
+                call.respond(HttpStatusCode.OK, SuccessResponse("Updated Item successfully", updatedItem))
+
             } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to (e.message ?: "Failed to update cart item"))
-                )
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, e.message ?: "Failed to update cart item"))
+
             }
         }
 
@@ -75,15 +66,10 @@ fun Route.cartRouting(cartService: CartService) {
                     ?: throw IllegalArgumentException("Invalid cart ID")
                 
                 val deletedItem = cartService.deleteCartItem(userId, cartId)
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf("msg" to "Cart item deleted successfully", "data" to deletedItem)
-                )
+                call.respond(HttpStatusCode.OK, SuccessResponse("Removed Item successfully", deletedItem))
+
             } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to (e.message ?: "Failed to delete cart item"))
-                )
+                call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, e.message ?: "Failed to delete cart item"))
             }
         }
     }

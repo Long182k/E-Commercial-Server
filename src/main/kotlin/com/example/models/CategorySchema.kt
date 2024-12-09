@@ -7,14 +7,13 @@ import java.util.UUID
 
 @Serializable
 data class Category(
-    val id: Int? = null,
     val title: String,
     val image: String
 )
 
 @Serializable
 data class CategoryResponse(
-    val id: String,
+    val id: Int,
     val title: String,
     val image: String
 )
@@ -65,25 +64,25 @@ class CategoryService(private val connection: Connection) {
         try {
             val responses = mutableListOf<CategoryResponse>()
             
-            connection.prepareStatement(INSERT_CATEGORY).use { statement ->
-                for (category in categories) {
-                    val categoryId = UUID.randomUUID().toString()
-                    
+            for (category in categories) {
+                connection.prepareStatement(INSERT_CATEGORY).use { statement ->
                     statement.setString(1, category.title)
                     statement.setString(2, category.image)
-                    statement.addBatch()
-
-                    responses.add(
-                        CategoryResponse(
-                            id = categoryId,
-                            title = category.title,
-                            image = category.image
+                    
+                    val resultSet = statement.executeQuery()
+                    if (resultSet.next()) {
+                        val id = resultSet.getInt("id")
+                        responses.add(
+                            CategoryResponse(
+                                id = id,
+                                title = category.title,
+                                image = category.image
+                            )
                         )
-                    )
+                    }
                 }
-                statement.executeBatch()
-                return@withContext responses
             }
+            return@withContext responses
         } catch (e: Exception) {
             throw Exception("Failed to add categories: ${e.message}")
         }
@@ -98,7 +97,7 @@ class CategoryService(private val connection: Connection) {
                 while (resultSet.next()) {
                     categories.add(
                         CategoryResponse(
-                            id = resultSet.getString("id"),
+                            id = resultSet.getInt("id"),
                             title = resultSet.getString("title"),
                             image = resultSet.getString("image")
                         )
@@ -111,15 +110,15 @@ class CategoryService(private val connection: Connection) {
         }
     }
 
-    suspend fun getCategoryById(id: String): CategoryResponse = withContext(Dispatchers.IO) {
+    suspend fun getCategoryById(id: Int): CategoryResponse = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(SELECT_CATEGORY_BY_ID).use { statement ->
-                statement.setString(1, id)
+                statement.setInt(1, id)
                 val resultSet = statement.executeQuery()
 
                 if (resultSet.next()) {
                     return@withContext CategoryResponse(
-                        id = resultSet.getString("id"),
+                        id = resultSet.getInt("id"),
                         title = resultSet.getString("title"),
                         image = resultSet.getString("image")
                     )
@@ -135,12 +134,12 @@ class CategoryService(private val connection: Connection) {
         }
     }
 
-    suspend fun updateCategory(id: String, category: Category): CategoryResponse = withContext(Dispatchers.IO) {
+    suspend fun updateCategory(id: Int, category: Category): CategoryResponse = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(UPDATE_CATEGORY).use { statement ->
                 statement.setString(1, category.title)
                 statement.setString(2, category.image)
-                statement.setString(3, id)
+                statement.setInt(3, id)
 
                 val rowsUpdated = statement.executeUpdate()
                 if (rowsUpdated == 0) {
@@ -148,7 +147,7 @@ class CategoryService(private val connection: Connection) {
                 }
 
                 return@withContext CategoryResponse(
-                    id = id,
+                    id = id.toInt(),
                     title = category.title,
                     image = category.image
                 )
@@ -161,10 +160,10 @@ class CategoryService(private val connection: Connection) {
         }
     }
 
-    suspend fun deleteCategory(id: String) = withContext(Dispatchers.IO) {
+    suspend fun deleteCategory(id: Int) = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(DELETE_CATEGORY).use { statement ->
-                statement.setString(1, id)
+                statement.setInt(1, id)
                 val rowsDeleted = statement.executeUpdate()
                 if (rowsDeleted == 0) {
                     throw CategoryNotFoundException()

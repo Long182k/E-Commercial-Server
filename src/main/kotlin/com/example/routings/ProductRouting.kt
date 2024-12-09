@@ -58,8 +58,11 @@ fun Route.productRouting(productService: ProductService) {
             try {
                 val id = call.parameters["id"]?.toInt()
                     ?: throw IllegalArgumentException("Invalid ID")
+                println("id: ${id}")
                 val rawBody = call.receiveText()
+                println("rawBody: ${rawBody}")
                 val product = Json.decodeFromString<Product>(rawBody)
+                println("product: ${product}")
 
                 try {
                     val updatedProduct = productService.updateProduct(id, product)
@@ -84,23 +87,6 @@ fun Route.productRouting(productService: ProductService) {
                 }
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
-            }
-        }
-
-        get("/category/{categoryId}") {
-            try {
-                val categoryId = call.parameters["categoryId"]?.toInt()
-                    ?: throw IllegalArgumentException("Invalid category ID")
-                val products = productService.getProductsByCategory(categoryId)
-                call.respond(
-                    HttpStatusCode.OK,
-                    mapOf("msg" to "Products retrieved successfully", "data" to products)
-                )
-            } catch (e: Exception) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to (e.message ?: "Failed to get products"))
-                )
             }
         }
     }

@@ -2,12 +2,11 @@ package com.example.models
 
 import kotlinx.serialization.Serializable
 import java.sql.Connection
+import java.sql.Statement
 import kotlinx.coroutines.*
-import java.util.UUID
 
 @Serializable
 data class Product(
-    val id: Int? = null,
     val title: String,
     val price: Double,
     val description: String,
@@ -17,12 +16,12 @@ data class Product(
 
 @Serializable
 data class ProductResponse(
-    val id: String,
+    val id: Int,
     val title: String,
     val description: String,
     val price: Double,
     val image: String,
-    val categoryId: String
+    val categoryId: Int
 )
 
 class ProductService(private val connection: Connection) {
@@ -63,6 +62,10 @@ class ProductService(private val connection: Connection) {
             WHERE id = ?
             RETURNING *
         """
+
+        private const val SELECT_ALL_PRODUCTS = """
+            SELECT * FROM products
+        """
     }
 
     init {
@@ -76,31 +79,31 @@ class ProductService(private val connection: Connection) {
         try {
             val responses = mutableListOf<ProductResponse>()
             
-            connection.prepareStatement(INSERT_PRODUCT).use { statement ->
-                for (product in products) {
-                    val productId = UUID.randomUUID().toString()
-                    
+            for (product in products) {
+                connection.prepareStatement(INSERT_PRODUCT).use { statement ->
                     statement.setString(1, product.title)
                     statement.setDouble(2, product.price)
                     statement.setString(3, product.description)
                     statement.setInt(4, product.categoryId)
                     statement.setString(5, product.image)
-                    statement.addBatch()
-
-                    responses.add(
-                        ProductResponse(
-                            id = productId,
-                            title = product.title,
-                            description = product.description,
-                            price = product.price,
-                            image = product.image,
-                            categoryId = product.categoryId.toString()
+                    
+                    val resultSet = statement.executeQuery()
+                    if (resultSet.next()) {
+                        val id = resultSet.getInt("id")
+                        responses.add(
+                            ProductResponse(
+                                id = id,
+                                title = product.title,
+                                description = product.description,
+                                price = product.price,
+                                image = product.image,
+                                categoryId = product.categoryId
+                            )
                         )
-                    )
+                    }
                 }
-                statement.executeBatch()
-                return@withContext responses
             }
+            return@withContext responses
         } catch (e: Exception) {
             throw Exception("Failed to add products: ${e.message}")
         }
@@ -108,19 +111,19 @@ class ProductService(private val connection: Connection) {
 
     suspend fun getProducts(): List<ProductResponse> = withContext(Dispatchers.IO) {
         try {
-            connection.prepareStatement(SELECT_PRODUCT_BY_ID).use { statement ->
+            connection.prepareStatement(SELECT_ALL_PRODUCTS).use { statement ->
                 val resultSet = statement.executeQuery()
                 val products = mutableListOf<ProductResponse>()
 
                 while (resultSet.next()) {
                     products.add(
                         ProductResponse(
-                            id = resultSet.getString("id"),
+                            id = resultSet.getInt("id").toInt(),
                             title = resultSet.getString("title"),
                             description = resultSet.getString("description"),
                             price = resultSet.getDouble("price"),
                             image = resultSet.getString("image"),
-                            categoryId = resultSet.getString("category_id")
+                            categoryId = resultSet.getInt("category_id")
                         )
                     )
                 }
@@ -139,7 +142,6 @@ class ProductService(private val connection: Connection) {
 
                 if (resultSet.next()) {
                     return@withContext Product(
-                        id = resultSet.getInt("id"),
                         title = resultSet.getString("title"),
                         price = resultSet.getDouble("price"),
                         description = resultSet.getString("description"),
@@ -168,7 +170,6 @@ class ProductService(private val connection: Connection) {
                 while (resultSet.next()) {
                     products.add(
                         Product(
-                            id = resultSet.getInt("id"),
                             title = resultSet.getString("title"),
                             price = resultSet.getDouble("price"),
                             description = resultSet.getString("description"),
@@ -197,12 +198,12 @@ class ProductService(private val connection: Connection) {
                 val resultSet = statement.executeQuery()
                 if (resultSet.next()) {
                     return@withContext ProductResponse(
-                        id = resultSet.getInt("id").toString(),
+                        id = resultSet.getInt("id").toInt(),
                         title = resultSet.getString("title"),
                         description = resultSet.getString("description"),
                         price = resultSet.getDouble("price"),
                         image = resultSet.getString("image"),
-                        categoryId = resultSet.getInt("category_id").toString()
+                        categoryId = resultSet.getInt("category_id").toInt()
                     )
                 } else {
                     throw ProductNotFoundException()
