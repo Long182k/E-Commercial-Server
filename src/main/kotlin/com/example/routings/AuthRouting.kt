@@ -13,7 +13,9 @@ fun Route.authRouting(userService: UserService) {
         post("/register") {
             try {
                 val rawBody = call.receiveText()
+                println("rawBody: ${rawBody}")
                 val user = Json.decodeFromString<User>(rawBody)
+                println("user: ${user}")
 
                 if (user.email.isBlank() || user.password.isBlank() || user.name.isBlank()) {
                     call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, "Missing required fields"))
@@ -35,7 +37,6 @@ fun Route.authRouting(userService: UserService) {
             try {
                 val rawBody = call.receiveText()
                 val credentials = Json.decodeFromString<LoginRequest>(rawBody)
-                println("credentials login: ${credentials}")
 
                 if (credentials.email.isBlank() || credentials.password.isBlank()) {
                     call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, "Missing email or password"))

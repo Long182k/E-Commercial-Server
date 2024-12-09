@@ -12,7 +12,7 @@ fun Route.orderRouting(orderService: OrderService) {
     route("/orders") {
         post("/{userId}") {
             try {
-                val userId = call.parameters["userId"] ?: throw IllegalArgumentException("Invalid user ID")
+                val userId = call.parameters["userId"]?.toInt() ?: throw IllegalArgumentException("Invalid user ID")
                 val rawBody = call.receiveText()
                 val address = Json.decodeFromString<Address>(rawBody)
 
@@ -29,15 +29,30 @@ fun Route.orderRouting(orderService: OrderService) {
 
         get("/{userId}") {
             try {
-                val userId = call.parameters["userId"] ?: throw IllegalArgumentException("Invalid user ID")
+                val userId = call.parameters["userId"]?.toInt() ?: throw IllegalArgumentException("Invalid user ID")
                 try {
                     val orders = orderService.getOrdersByUserId(userId)
                     call.respond(HttpStatusCode.OK, SuccessResponse("List order", orders))
                 } catch (e: Exception) {
-                    call.respond(HttpStatusCode.NotFound, ErrorResponse(404, "User not found"))
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse(404, e.message ?: "Unknown error"))
                 }
             } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
+            }
+        }
+
+        get("/checkout/{userId}") {
+            try {
+                val userId = call.parameters["userId"]?.toIntOrNull() 
+                    ?: throw IllegalArgumentException("Invalid user ID")
+                
+                val response = orderService.getCheckoutSummary(userId)
+                call.respond(HttpStatusCode.OK, response)
+            } catch (e: Exception) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(400, e.message ?: "Unknown error")
+                )
             }
         }
     }

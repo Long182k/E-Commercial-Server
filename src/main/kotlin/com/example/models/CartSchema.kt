@@ -3,19 +3,18 @@ package com.example.models
 import kotlinx.serialization.Serializable
 import java.sql.Connection
 import kotlinx.coroutines.*
-import java.util.UUID
 
 @Serializable
 data class CartItem(
-    val productId: String,
+    val productId: Int,
     val quantity: Int
 )
 
 @Serializable
 data class CartItemResponse(
-    val id: String,
-    val productId: String,
-    val userId: String,
+    val id: Int,
+    val productId: Int,
+    val userId: Int,
     val price: Double,
     val imageUrl: String,
     val quantity: Int,
@@ -26,17 +25,17 @@ class CartService(private val connection: Connection, private val productService
     companion object {
         private const val CREATE_TABLE_CART = """
             CREATE TABLE IF NOT EXISTS CART (
-                ID VARCHAR(36) PRIMARY KEY,
-                USER_ID VARCHAR(36) REFERENCES USERS(ID),
-                PRODUCT_ID VARCHAR(36) REFERENCES PRODUCTS(ID),
+                ID SERIAL PRIMARY KEY,
+                USER_ID INT REFERENCES USERS(ID),
+                PRODUCT_ID INT REFERENCES PRODUCTS(ID),
                 QUANTITY INT NOT NULL,
                 CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """
 
         private const val INSERT_CART_ITEM = """
-            INSERT INTO cart (id, user_id, product_id, quantity) 
-            VALUES (?, ?, ?, ?)
+            INSERT INTO cart (user_id, product_id, quantity) 
+            VALUES (?, ?, ?) RETURNING id
         """
 
         private const val SELECT_CART_BY_USER = """
@@ -64,20 +63,20 @@ class CartService(private val connection: Connection, private val productService
         }
     }
 
-    suspend fun addToCart(userId: String, cartItem: CartItem): CartItemResponse = withContext(Dispatchers.IO) {
+    suspend fun addToCart(userId: Int, cartItem: CartItem):  List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
-            // Verify product exists and get its details
             val product = productService.getProductById(cartItem.productId)
-            val cartId = UUID.randomUUID().toString()
-
+            
             connection.prepareStatement(INSERT_CART_ITEM).use { statement ->
-                statement.setString(1, cartId)
-                statement.setString(2, userId)
-                statement.setString(3, cartItem.productId)
-                statement.setInt(4, cartItem.quantity)
-                statement.executeUpdate()
+                statement.setInt(1, userId)
+                statement.setInt(2, cartItem.productId)
+                statement.setInt(3, cartItem.quantity)
+                
+                val resultSet = statement.executeQuery()
+                resultSet.next()
+                val cartId = resultSet.getInt("id")
 
-                return@withContext CartItemResponse(
+                val cartItemResponse = CartItemResponse(
                     id = cartId,
                     productId = cartItem.productId,
                     userId = userId,
@@ -86,51 +85,64 @@ class CartService(private val connection: Connection, private val productService
                     quantity = cartItem.quantity,
                     productName = product.title
                 )
+
+                return@withContext listOf(cartItemResponse)
             }
         } catch (e: Exception) {
             throw Exception("Failed to add item to cart: ${e.message}")
         }
     }
 
-    suspend fun getCartByUserId(userId: String): List<CartItemResponse> = withContext(Dispatchers.IO) {
+    suspend fun getCartByUserId(userId: Int): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
+            println("Fetching cart for userId: $userId")
             connection.prepareStatement(SELECT_CART_BY_USER).use { statement ->
-                statement.setString(1, userId)
+                statement.setInt(1, userId)
                 val resultSet = statement.executeQuery()
                 val cartItems = mutableListOf<CartItemResponse>()
 
                 while (resultSet.next()) {
-                    cartItems.add(
-                        CartItemResponse(
-                            id = resultSet.getString("id"),
-                            productId = resultSet.getString("product_id"),
-                            userId = resultSet.getString("user_id"),
+                    println("Processing row...")
+                    try {
+                        val item = CartItemResponse(
+                            id = resultSet.getInt("id"),
+                            productId = resultSet.getInt("product_id"),
+                            userId = resultSet.getInt("user_id"),
                             price = resultSet.getDouble("price"),
                             imageUrl = resultSet.getString("image_url"),
                             quantity = resultSet.getInt("quantity"),
                             productName = resultSet.getString("product_name")
                         )
-                    )
+                        cartItems.add(item)
+                        println("Added item to cart: $item")
+                    } catch (e: Exception) {
+                        println("Error processing row: ${e.message}")
+                    }
                 }
+                println("Final cart items count: ${cartItems.size}")
                 return@withContext cartItems
             }
         } catch (e: Exception) {
+            println("Error fetching cart: ${e.message}")
             throw Exception("Failed to get cart items: ${e.message}")
         }
     }
 
-    suspend fun updateCartQuantity(userId: String, cartId: String, quantity: Int): CartItemResponse = withContext(Dispatchers.IO) {
+    suspend fun updateCartQuantity(userId: Int, cartId: Int, quantity: Int): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(UPDATE_CART_QUANTITY).use { statement ->
                 statement.setInt(1, quantity)
-                statement.setString(2, cartId)
-                statement.setString(3, userId)
+                statement.setInt(2, cartId)
+                statement.setInt(3, userId)
                 
                 val rowsUpdated = statement.executeUpdate()
                 if (rowsUpdated == 0) throw CartItemNotFoundException()
 
+                val updatedCartItem = getCartByUserId(userId).first { it.id == cartId }
+
+
                 // Get updated cart item
-                return@withContext getCartByUserId(userId).first { it.id == cartId }
+                return@withContext listOf(updatedCartItem)
             }
         } catch (e: Exception) {
             when (e) {
@@ -140,20 +152,20 @@ class CartService(private val connection: Connection, private val productService
         }
     }
 
-    suspend fun deleteCartItem(userId: String, cartId: String): CartItemResponse = withContext(Dispatchers.IO) {
+    suspend fun deleteCartItem(userId: Int, cartId: Int): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
             // Get cart item before deletion
             val cartItem = getCartByUserId(userId).firstOrNull { it.id == cartId }
                 ?: throw CartItemNotFoundException()
 
             connection.prepareStatement(DELETE_CART_ITEM).use { statement ->
-                statement.setString(1, cartId)
-                statement.setString(2, userId)
+                statement.setInt(1, cartId)
+                statement.setInt(2, userId)
                 
                 val rowsDeleted = statement.executeUpdate()
                 if (rowsDeleted == 0) throw CartItemNotFoundException()
 
-                return@withContext cartItem
+                return@withContext listOf(cartItem)
             }
         } catch (e: Exception) {
             when (e) {
@@ -164,4 +176,4 @@ class CartService(private val connection: Connection, private val productService
     }
 }
 
-class CartItemNotFoundException : Exception("Cart item not found") 
+class CartItemNotFoundException : Exception("Cart item not found")

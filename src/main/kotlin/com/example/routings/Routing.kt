@@ -14,6 +14,7 @@ fun Application.configureRouting() {
     val cartService = CartService(dbConnection, productService)
     val orderService = OrderService(dbConnection, cartService)
 
+
     routing {
         authRouting(userService)
         categoryRouting(categoryService)

@@ -41,7 +41,8 @@ fun Route.productRouting(productService: ProductService) {
 
         get("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toInt() 
+                    ?: throw IllegalArgumentException("Invalid ID")
                 try {
                     val product = productService.getProductById(id)
                     call.respond(HttpStatusCode.OK, SuccessResponse("Product retrieved successfully", product))
@@ -55,9 +56,13 @@ fun Route.productRouting(productService: ProductService) {
 
         put("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toInt()
+                    ?: throw IllegalArgumentException("Invalid ID")
+                println("id: ${id}")
                 val rawBody = call.receiveText()
+                println("rawBody: ${rawBody}")
                 val product = Json.decodeFromString<Product>(rawBody)
+                println("product: ${product}")
 
                 try {
                     val updatedProduct = productService.updateProduct(id, product)
@@ -72,7 +77,8 @@ fun Route.productRouting(productService: ProductService) {
 
         delete("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toInt()
+                    ?: throw IllegalArgumentException("Invalid ID")
                 try {
                     productService.deleteProduct(id)
                     call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Product deleted successfully", Unit))

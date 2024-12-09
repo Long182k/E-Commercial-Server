@@ -41,7 +41,7 @@ fun Route.categoryRouting(categoryService: CategoryService) {
 
         get("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toIntOrNull() ?: throw IllegalArgumentException("Invalid ID")
                 try {
                     val category = categoryService.getCategoryById(id)
                     call.respond(HttpStatusCode.OK, SuccessResponse("Category retrieved successfully", category))
@@ -55,7 +55,7 @@ fun Route.categoryRouting(categoryService: CategoryService) {
 
         put("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toIntOrNull() ?: throw IllegalArgumentException("Invalid ID")
                 val rawBody = call.receiveText()
                 val category = Json.decodeFromString<Category>(rawBody)
 
@@ -72,7 +72,7 @@ fun Route.categoryRouting(categoryService: CategoryService) {
 
         delete("{id}") {
             try {
-                val id = call.parameters["id"] ?: throw IllegalArgumentException("Invalid ID")
+                val id = call.parameters["id"]?.toIntOrNull() ?: throw IllegalArgumentException("Invalid ID")
                 try {
                     categoryService.deleteCategory(id)
                     call.respond(HttpStatusCode.OK, SuccessResponse<Unit>("Category deleted successfully", Unit))
