@@ -21,7 +21,8 @@ data class ProductResponse(
     val description: String,
     val price: Double,
     val image: String,
-    val categoryId: Int
+    val categoryId: Int,
+    val sellNumber?: Int
 )
 
 class ProductService(private val connection: Connection) {
@@ -33,7 +34,8 @@ class ProductService(private val connection: Connection) {
                 PRICE DECIMAL(10,2) NOT NULL,
                 DESCRIPTION TEXT,
                 CATEGORY_ID INT REFERENCES CATEGORIES(ID),
-                IMAGE VARCHAR(255)
+                IMAGE VARCHAR(255),
+                SELL_NUMBER INT DEFAULT 0
             );
         """
 
@@ -47,7 +49,8 @@ class ProductService(private val connection: Connection) {
         """
 
         private const val SELECT_PRODUCTS_BY_CATEGORY = """
-            SELECT * FROM products WHERE category_id = ?
+            SELECT * FROM products 
+            WHERE category_id = ?
         """
 
         private const val UPDATE_PRODUCT = """
@@ -66,13 +69,25 @@ class ProductService(private val connection: Connection) {
         private const val SELECT_ALL_PRODUCTS = """
             SELECT * FROM products
         """
+
+        private const val SELECT_BEST_SELLERS = """
+            SELECT * FROM products 
+            ORDER BY sell_number DESC 
+            LIMIT 10
+        """
+
+        private const val UPDATE_PRODUCT_SELL_NUMBER = """
+            UPDATE products 
+            SET sell_number = sell_number + ? 
+            WHERE id = ?
+        """
     }
 
     init {
-        connection.createStatement().use { statement ->
-            statement.execute(CREATE_TABLE_PRODUCTS)
-            println("Products table created or verified successfully")
-        }
+        // connection.createStatement().use { statement ->
+            // statement.execute(CREATE_TABLE_PRODUCTS)
+            
+        // }
     }
 
     suspend fun addProducts(products: List<Product>): List<ProductResponse> = withContext(Dispatchers.IO) {
@@ -97,7 +112,8 @@ class ProductService(private val connection: Connection) {
                                 description = product.description,
                                 price = product.price,
                                 image = product.image,
-                                categoryId = product.categoryId
+                                categoryId = product.categoryId,
+                                sellNumber = 0
                             )
                         )
                     }
@@ -123,7 +139,8 @@ class ProductService(private val connection: Connection) {
                             description = resultSet.getString("description"),
                             price = resultSet.getDouble("price"),
                             image = resultSet.getString("image"),
-                            categoryId = resultSet.getInt("category_id")
+                            categoryId = resultSet.getInt("category_id"),
+                            sellNumber = resultSet.getInt("sell_number")
                         )
                     )
                 }
@@ -203,7 +220,8 @@ class ProductService(private val connection: Connection) {
                         description = resultSet.getString("description"),
                         price = resultSet.getDouble("price"),
                         image = resultSet.getString("image"),
-                        categoryId = resultSet.getInt("category_id").toInt()
+                        categoryId = resultSet.getInt("category_id").toInt(),
+                        sellNumber = resultSet.getInt("sell_number")
                     )
                 } else {
                     throw ProductNotFoundException()
@@ -232,6 +250,44 @@ class ProductService(private val connection: Connection) {
                 is ProductNotFoundException -> throw e
                 else -> throw Exception("Failed to delete product: ${e.message}")
             }
+        }
+    }
+
+    suspend fun getBestSellers(): List<ProductResponse> = withContext(Dispatchers.IO) {
+        try {
+            connection.prepareStatement(SELECT_BEST_SELLERS).use { statement ->
+                val resultSet = statement.executeQuery()
+                val products = mutableListOf<ProductResponse>()
+
+                while (resultSet.next()) {
+                    products.add(
+                        ProductResponse(
+                            id = resultSet.getInt("id"),
+                            title = resultSet.getString("title"),
+                            description = resultSet.getString("description"),
+                            price = resultSet.getDouble("price"),
+                            image = resultSet.getString("image"),
+                            categoryId = resultSet.getInt("category_id"),
+                            sellNumber = resultSet.getInt("sell_number")
+                        )
+                    )
+                }
+                return@withContext products
+            }
+        } catch (e: Exception) {
+            throw Exception("Failed to get best sellers: ${e.message}")
+        }
+    }
+
+    suspend fun updateProductSellNumber(productId: Int, quantity: Int) = withContext(Dispatchers.IO) {
+        try {
+            connection.prepareStatement(UPDATE_PRODUCT_SELL_NUMBER).use { statement ->
+                statement.setInt(1, quantity)
+                statement.setInt(2, productId)
+                statement.executeUpdate()
+            }
+        } catch (e: Exception) {
+            throw Exception("Failed to update product sell number: ${e.message}")
         }
     }
 }

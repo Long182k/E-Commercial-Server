@@ -89,5 +89,30 @@ fun Route.productRouting(productService: ProductService) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
             }
         }
+
+        get("category/{categoryId}") {
+            try {
+                val categoryId = call.parameters["categoryId"]?.toInt()
+                    ?: throw IllegalArgumentException("Invalid category ID")
+                
+                val products = productService.getProductsByCategory(categoryId)
+                if (products.isEmpty()) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse(404, "No products found for this category"))
+                } else {
+                    call.respond(HttpStatusCode.OK, SuccessResponse("Products retrieved successfully", products))
+                }
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
+            }
+        }
+
+        get("best-sellers") {
+            try {
+                val products = productService.getBestSellers()
+                call.respond(HttpStatusCode.OK, SuccessResponse("Best sellers retrieved successfully", products))
+            } catch (e: Exception) {
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
+            }
+        }
     }
 } 
