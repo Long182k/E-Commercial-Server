@@ -75,7 +75,8 @@ data class CheckoutResponse(
 
 class OrderService(
     private val connection: Connection,
-    private val cartService: CartService
+    private val cartService: CartService,
+    private val productService: ProductService
 ) {
     companion object {
         private const val CREATE_TABLE_ORDERS = """
@@ -173,13 +174,14 @@ class OrderService(
                 // Insert address
                 createAddress(orderId, address)
 
-                // Insert order items
+                // Insert order items and update sell numbers
                 val orderItems = cartItems.map { cartItem ->
+                    // Update sell number for each product
+                    productService.updateProductSellNumber(cartItem.productId, cartItem.quantity)
                     insertOrderItem(orderId, cartItem)
                 }
 
                 return@withContext orderId
-
             }
         } catch (e: Exception) {
             throw Exception("Failed to place order: ${e.message}")

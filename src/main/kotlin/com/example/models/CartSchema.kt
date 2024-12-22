@@ -54,6 +54,17 @@ class CartService(private val connection: Connection, private val productService
             DELETE FROM cart 
             WHERE id = ? AND user_id = ?
         """
+
+        private const val CHECK_EXISTING_CART_ITEM = """
+            SELECT id, quantity FROM cart 
+            WHERE user_id = ? AND product_id = ?
+        """
+
+        private const val UPDATE_EXISTING_CART_ITEM = """
+            UPDATE cart SET quantity = quantity + ? 
+            WHERE user_id = ? AND product_id = ? 
+            RETURNING id
+        """
     }
 
     init {
@@ -63,18 +74,37 @@ class CartService(private val connection: Connection, private val productService
         }
     }
 
-    suspend fun addToCart(userId: Int, cartItem: CartItem):  List<CartItemResponse> = withContext(Dispatchers.IO) {
+    suspend fun addToCart(userId: Int, cartItem: CartItem): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
             val product = productService.getProductById(cartItem.productId)
             
-            connection.prepareStatement(INSERT_CART_ITEM).use { statement ->
-                statement.setInt(1, userId)
-                statement.setInt(2, cartItem.productId)
-                statement.setInt(3, cartItem.quantity)
+            // Check if the product already exists in the user's cart
+            connection.prepareStatement(CHECK_EXISTING_CART_ITEM).use { checkStatement ->
+                checkStatement.setInt(1, userId)
+                checkStatement.setInt(2, cartItem.productId)
+                val checkResult = checkStatement.executeQuery()
                 
-                val resultSet = statement.executeQuery()
-                resultSet.next()
-                val cartId = resultSet.getInt("id")
+                val cartId = if (checkResult.next()) {
+                    // Product exists in cart, update quantity
+                    connection.prepareStatement(UPDATE_EXISTING_CART_ITEM).use { updateStatement ->
+                        updateStatement.setInt(1, cartItem.quantity)
+                        updateStatement.setInt(2, userId)
+                        updateStatement.setInt(3, cartItem.productId)
+                        val resultSet = updateStatement.executeQuery()
+                        resultSet.next()
+                        resultSet.getInt("id")
+                    }
+                } else {
+                    // Product doesn't exist in cart, insert new item
+                    connection.prepareStatement(INSERT_CART_ITEM).use { insertStatement ->
+                        insertStatement.setInt(1, userId)
+                        insertStatement.setInt(2, cartItem.productId)
+                        insertStatement.setInt(3, cartItem.quantity)
+                        val resultSet = insertStatement.executeQuery()
+                        resultSet.next()
+                        resultSet.getInt("id")
+                    }
+                }
 
                 val cartItemResponse = CartItemResponse(
                     id = cartId,

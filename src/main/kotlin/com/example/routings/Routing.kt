@@ -12,7 +12,7 @@ fun Application.configureRouting() {
     val categoryService = CategoryService(dbConnection)
     val productService = ProductService(dbConnection)
     val cartService = CartService(dbConnection, productService)
-    val orderService = OrderService(dbConnection, cartService)
+    val orderService = OrderService(dbConnection, cartService, productService)
 
 
     routing {
