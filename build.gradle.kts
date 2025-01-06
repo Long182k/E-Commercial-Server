@@ -1,4 +1,3 @@
-
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor)
@@ -46,4 +45,10 @@ dependencies {
     implementation("io.ktor:ktor-server-swagger:2.3.0")
     implementation("io.ktor:ktor-server-openapi:2.3.0")
 
+}
+
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "com.example.ApplicationKt"
+    }
 }
