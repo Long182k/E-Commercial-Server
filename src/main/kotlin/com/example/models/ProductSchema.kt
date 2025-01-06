@@ -22,7 +22,7 @@ data class ProductResponse(
     val price: Double,
     val image: String,
     val categoryId: Int,
-    val sellNumber?: Int
+    val sellNumber: Int
 )
 
 class ProductService(private val connection: Connection) {
@@ -84,10 +84,10 @@ class ProductService(private val connection: Connection) {
     }
 
     init {
-        // connection.createStatement().use { statement ->
-            // statement.execute(CREATE_TABLE_PRODUCTS)
+        connection.createStatement().use { statement ->
+            statement.execute(CREATE_TABLE_PRODUCTS)
             
-        // }
+        }
     }
 
     suspend fun addProducts(products: List<Product>): List<ProductResponse> = withContext(Dispatchers.IO) {
