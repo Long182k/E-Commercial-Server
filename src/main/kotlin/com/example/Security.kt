@@ -19,14 +19,9 @@ fun Application.configureSecurity() {
         basic("auth-basic") {
             realm = "Ktor Server"
             validate { credentials ->
-                // Validate user login credentials with your service
                 try {
-                    val user = userService.login(LoginRequest(credentials.name, credentials.password))
-                    if (user != null) {
-                        UserIdPrincipal(credentials.name)
-                    } else {
-                        null
-                    }
+                    userService.login(LoginRequest(credentials.name, credentials.password))
+                        ?.let { UserIdPrincipal(credentials.name) }
                 } catch (e: Exception) {
                     null
                 }
