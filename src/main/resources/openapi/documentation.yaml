@@ -29,20 +29,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - email
-                - password
-                - name
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  format: password
-                name:
-                  type: string
+              $ref: "#/components/schemas/User"
       responses:
         "201":
           description: User registered successfully
@@ -51,15 +38,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
         "400":
-          description: Missing required fields
+          description: Missing required fields or invalid input
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: Username or email already exists
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /auth/login:
     post:
@@ -91,10 +86,79 @@ paths:
                 $ref: "#/components/schemas/SuccessResponse"
         "400":
           description: Missing email or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication
+      summary: Change user password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - oldPassword
+                - newPassword
+              properties:
+                email:
+                  type: string
+                  format: email
+                oldPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Current password is incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # Product endpoints
   /products:
@@ -116,11 +180,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProductsResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: Failed to add products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     get:
       tags:
@@ -128,15 +200,23 @@ paths:
       summary: Get all products
       responses:
         "200":
-          description: List of products
+          description: Products retrieved successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProductsResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
           description: No products found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /products/{id}:
     get:
@@ -144,25 +224,41 @@ paths:
         - Products
       summary: Get product by ID
       parameters:
-        - $ref: "#/components/parameters/idParam"
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
-          description: Product details
+          description: Product retrieved successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProductResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
           description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     put:
       tags:
         - Products
       summary: Update product
       parameters:
-        - $ref: "#/components/parameters/idParam"
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
@@ -175,25 +271,99 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProductResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
           description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     delete:
       tags:
         - Products
       summary: Delete product
       parameters:
-        - $ref: "#/components/parameters/idParam"
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
           description: Product deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
           description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/category/{categoryId}:
+    get:
+      tags:
+        - Products
+      summary: Get products by category
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: No products found for this category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/best-sellers:
+    get:
+      tags:
+        - Products
+      summary: Get best selling products
+      responses:
+        "200":
+          description: Best sellers retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # Category endpoints
   /categories:
@@ -201,8 +371,6 @@ paths:
       tags:
         - Categories
       summary: Create categories
-      description: Create multiple categories at once
-      operationId: createCategories
       requestBody:
         required: true
         content:
@@ -211,36 +379,37 @@ paths:
               type: array
               items:
                 $ref: "#/components/schemas/CategoryRequest"
-            example:
-              - title: "Electronics"
-                image: "https://example.com/electronics.jpg"
-              - title: "Fashion"
-                image: "https://example.com/fashion.jpg"
       responses:
         "201":
           description: Categories created successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CategoriesResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: Failed to add categories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     get:
       tags:
         - Categories
       summary: Get all categories
-      description: Retrieve a list of all categories
-      operationId: getCategories
       responses:
         "200":
           description: Categories retrieved successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CategoriesResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
           description: No categories found
           content:
@@ -248,30 +417,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /categories/{id}:
     get:
       tags:
         - Categories
       summary: Get category by ID
-      description: Retrieve a specific category by its ID
-      operationId: getCategoryById
       parameters:
         - name: id
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
-          description: Category ID
+            type: integer
       responses:
         "200":
           description: Category retrieved successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CategoryResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
           description: Category not found
           content:
@@ -279,22 +448,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     put:
       tags:
         - Categories
       summary: Update category
-      description: Update an existing category by its ID
-      operationId: updateCategory
       parameters:
         - name: id
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
-          description: Category ID
+            type: integer
       requestBody:
         required: true
         content:
@@ -307,7 +476,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CategoryResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
           description: Category not found
           content:
@@ -315,22 +484,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     delete:
       tags:
         - Categories
       summary: Delete category
-      description: Delete a category by its ID
-      operationId: deleteCategory
       parameters:
         - name: id
           in: path
           required: true
           schema:
-            type: string
-            format: uuid
-          description: Category ID
+            type: integer
       responses:
         "200":
           description: Category deleted successfully
@@ -345,7 +514,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # Cart endpoints
   /cart/{userId}:
@@ -354,87 +527,140 @@ paths:
         - Cart
       summary: Add item to cart
       parameters:
-        - $ref: "#/components/parameters/userIdParam"
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CartItemRequest"
+              $ref: "#/components/schemas/CartItem"
       responses:
         "200":
           description: Item added to cart successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CartItemResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: Failed to add item to cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     get:
       tags:
         - Cart
       summary: Get user's cart
       parameters:
-        - $ref: "#/components/parameters/userIdParam"
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
           description: Cart items retrieved successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CartItemsResponse"
-        "404":
-          description: User not found
+                $ref: "#/components/schemas/SuccessResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
-  /cart/{userId}/{id}:
+  /cart/{userId}/{cartId}:
     put:
       tags:
         - Cart
       summary: Update cart item quantity
       parameters:
-        - $ref: "#/components/parameters/userIdParam"
-        - $ref: "#/components/parameters/idParam"
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: cartId
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CartItemRequest"
+              type: object
+              properties:
+                quantity:
+                  type: integer
       responses:
         "200":
           description: Cart item updated successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CartItemResponse"
-        "404":
-          description: Cart item not found
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Failed to update cart item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     delete:
       tags:
         - Cart
       summary: Remove item from cart
       parameters:
-        - $ref: "#/components/parameters/userIdParam"
-        - $ref: "#/components/parameters/idParam"
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: cartId
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
           description: Item removed from cart successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CartItemResponse"
-        "404":
-          description: Cart item not found
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Failed to delete cart item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   # Order endpoints
   /orders/{userId}:
@@ -443,42 +669,91 @@ paths:
         - Orders
       summary: Place order
       parameters:
-        - $ref: "#/components/parameters/userIdParam"
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AddressRequest"
+              $ref: "#/components/schemas/Address"
       responses:
         "200":
           description: Order placed successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OrderResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          description: Failed to place order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
     get:
       tags:
         - Orders
       summary: Get user's orders
       parameters:
-        - $ref: "#/components/parameters/userIdParam"
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
           description: Orders retrieved successfully
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/OrdersResponse"
+                $ref: "#/components/schemas/SuccessResponse"
         "404":
-          description: User not found
+          description: No orders found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
-          $ref: "#/components/responses/InternalError"
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders/checkout/{userId}:
+    get:
+      tags:
+        - Orders
+      summary: Get checkout summary
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Checkout summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "400":
+          description: Failed to get checkout summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   parameters:
@@ -518,11 +793,28 @@ components:
       type: object
       required:
         - title
-        - description
         - price
-        - image
+        - description
         - categoryId
+        - image
       properties:
+        title:
+          type: string
+        price:
+          type: number
+          format: double
+        description:
+          type: string
+        categoryId:
+          type: integer
+        image:
+          type: string
+
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: integer
         title:
           type: string
         description:
@@ -533,32 +825,9 @@ components:
         image:
           type: string
         categoryId:
-          type: string
-          format: uuid
-
-    ProductResponse:
-      type: object
-      properties:
-        msg:
-          type: string
-        data:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
-            title:
-              type: string
-            description:
-              type: string
-            price:
-              type: number
-              format: double
-            image:
-              type: string
-            categoryId:
-              type: string
-              format: uuid
+          type: integer
+        sellNumber:
+          type: integer
 
     ProductsResponse:
       type: object
@@ -578,30 +847,18 @@ components:
       properties:
         title:
           type: string
-          example: "Electronics"
         image:
           type: string
-          example: "https://example.com/electronics.jpg"
 
     CategoryResponse:
       type: object
       properties:
-        msg:
+        id:
+          type: integer
+        title:
           type: string
-          example: "Success"
-        data:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
-              example: "123e4567-e89b-12d3-a456-426614174000"
-            title:
-              type: string
-              example: "Electronics"
-            image:
-              type: string
-              example: "https://example.com/electronics.jpg"
+        image:
+          type: string
 
     CategoriesResponse:
       type: object
@@ -629,38 +886,28 @@ components:
         - quantity
       properties:
         productId:
-          type: string
-          format: uuid
+          type: integer
         quantity:
           type: integer
-          minimum: 1
 
     CartItemResponse:
       type: object
       properties:
-        msg:
+        id:
+          type: integer
+        productId:
+          type: integer
+        userId:
+          type: integer
+        price:
+          type: number
+          format: double
+        imageUrl:
           type: string
-        data:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
-            productId:
-              type: string
-              format: uuid
-            userId:
-              type: string
-              format: uuid
-            price:
-              type: number
-              format: double
-            imageUrl:
-              type: string
-            quantity:
-              type: integer
-            productName:
-              type: string
+        quantity:
+          type: integer
+        productName:
+          type: string
 
     CartItemsResponse:
       type: object
@@ -695,14 +942,23 @@ components:
     OrderResponse:
       type: object
       properties:
-        msg:
+        id:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemResponse"
+        orderDate:
           type: string
-        data:
-          type: object
-          properties:
-            id:
-              type: string
-              format: uuid
+        status:
+          type: string
+        totalAmount:
+          type: number
+          format: double
+        userId:
+          type: integer
+        address:
+          $ref: "#/components/schemas/AddressRequest"
 
     OrdersResponse:
       type: object
@@ -750,6 +1006,106 @@ components:
                 format: uuid
               address:
                 $ref: "#/components/schemas/AddressRequest"
+
+    User:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        name:
+          type: string
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+
+    Address:
+      type: object
+      required:
+        - addressLine
+        - city
+        - state
+        - postalCode
+        - country
+      properties:
+        addressLine:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    OrderItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+        productId:
+          type: integer
+        quantity:
+          type: integer
+        price:
+          type: number
+          format: double
+        userId:
+          type: integer
+        productName:
+          type: string
+
+    Summary:
+      type: object
+      properties:
+        discount:
+          type: number
+          format: double
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItemResponse"
+        shipping:
+          type: number
+          format: double
+        subtotal:
+          type: number
+          format: double
+        tax:
+          type: number
+          format: double
+        total:
+          type: number
+          format: double
+
+    CheckoutResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/Summary"
+        msg:
+          type: string
 
   responses:
     BadRequest:
