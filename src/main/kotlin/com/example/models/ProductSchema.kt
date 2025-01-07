@@ -151,19 +151,21 @@ class ProductService(private val connection: Connection) {
         }
     }
 
-    suspend fun getProductById(id: Int): Product = withContext(Dispatchers.IO) {
+    suspend fun getProductById(id: Int): ProductResponse = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(SELECT_PRODUCT_BY_ID).use { statement ->
                 statement.setInt(1, id)
                 val resultSet = statement.executeQuery()
 
                 if (resultSet.next()) {
-                    return@withContext Product(
+                    return@withContext ProductResponse(
+                        id = resultSet.getInt("id"),
                         title = resultSet.getString("title"),
                         price = resultSet.getDouble("price"),
                         description = resultSet.getString("description"),
                         categoryId = resultSet.getInt("category_id"),
-                        image = resultSet.getString("image")
+                        image = resultSet.getString("image"),
+                        sellNumber = resultSet.getInt("sell_number")
                     )
                 } else {
                     throw ProductNotFoundException()
@@ -177,21 +179,23 @@ class ProductService(private val connection: Connection) {
         }
     }
 
-    suspend fun getProductsByCategory(categoryId: Int): List<Product> = withContext(Dispatchers.IO) {
+    suspend fun getProductsByCategory(categoryId: Int): List<ProductResponse> = withContext(Dispatchers.IO) {
         try {
             connection.prepareStatement(SELECT_PRODUCTS_BY_CATEGORY).use { statement ->
                 statement.setInt(1, categoryId)
                 val resultSet = statement.executeQuery()
-                val products = mutableListOf<Product>()
+                val products = mutableListOf<ProductResponse>()
 
                 while (resultSet.next()) {
                     products.add(
-                        Product(
+                        ProductResponse(
+                            id = resultSet.getInt("id"),
                             title = resultSet.getString("title"),
                             price = resultSet.getDouble("price"),
                             description = resultSet.getString("description"),
                             categoryId = resultSet.getInt("category_id"),
-                            image = resultSet.getString("image")
+                            image = resultSet.getString("image"),
+                            sellNumber = resultSet.getInt("sell_number")
                         )
                     )
                 }

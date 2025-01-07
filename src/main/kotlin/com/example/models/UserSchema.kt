@@ -20,6 +20,13 @@ data class LoginRequest(
 )
 
 @Serializable
+data class ChangePasswordRequest(
+    val email: String,
+    val oldPassword: String,
+    val newPassword: String
+)
+
+@Serializable
 data class SuccessResponse<T>(
     val msg: String = "Success",
     val data: T
@@ -71,6 +78,10 @@ class UserService(private val connection: Connection) {
         private const val SELECT_USER_BY_USERNAME = """
             SELECT COUNT(*) FROM users 
             WHERE username = ?
+        """
+        private const val UPDATE_PASSWORD = """
+            UPDATE users SET password = ? 
+            WHERE email = ? AND password = ?
         """
     }
 
@@ -157,6 +168,44 @@ class UserService(private val connection: Connection) {
         }
     }
 
+    suspend fun changePassword(request: ChangePasswordRequest): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // Check if user exists first
+            if (!checkEmailExists(request.email)) {
+                throw UserNotFoundException("User not found")
+            }
+
+            // Validate input
+            if (request.email.isBlank() || request.oldPassword.isBlank() || request.newPassword.isBlank()) {
+                throw IllegalArgumentException("All fields are required")
+            }
+
+            if (request.newPassword.length < 6) {
+                throw IllegalArgumentException("New password must be at least 6 characters")
+            }
+
+
+            connection.prepareStatement(UPDATE_PASSWORD).use { statement ->
+                statement.setString(1, request.newPassword)
+                statement.setString(2, request.email)
+                statement.setString(3, request.oldPassword)
+                
+                val updatedRows = statement.executeUpdate()
+                if (updatedRows == 0) {
+                    throw InvalidCredentialsException()
+                }
+                return@withContext true
+            }
+        } catch (e: Exception) {
+            when (e) {
+                is InvalidCredentialsException -> throw e
+                is IllegalArgumentException -> throw e
+                is UserNotFoundException -> throw e
+                else -> throw Exception("Password change failed: ${e.message}")
+            }
+        }
+    }
+
     private fun validateRegistrationInput(user: User) {
         if (user.email.isBlank() || user.password.isBlank() || user.name.isBlank()) {
             throw IllegalArgumentException("Email, password, and name are required")
@@ -220,3 +269,4 @@ class UserService(private val connection: Connection) {
 
 class UserExistsException(message: String? = null) : Exception(message ?: "User already exists")
 class InvalidCredentialsException : Exception("Invalid email or password")
+class UserNotFoundException(message: String) : Exception(message)

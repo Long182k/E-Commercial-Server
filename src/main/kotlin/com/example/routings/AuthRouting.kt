@@ -53,5 +53,25 @@ fun Route.authRouting(userService: UserService) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
             }
         }
+
+        post("/change-password") {
+            try {
+                val rawBody = call.receiveText()
+                val request = Json.decodeFromString<ChangePasswordRequest>(rawBody)
+
+                try {
+                    userService.changePassword(request)
+                    call.respond(HttpStatusCode.OK, SuccessResponse("Password changed successfully", true))
+                } catch (e: InvalidCredentialsException) {
+                    call.respond(HttpStatusCode.Unauthorized, ErrorResponse(401, e.message ?:"Current password is incorrect"))
+                } catch (e: IllegalArgumentException) {
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, e.message ?: "Invalid input"))
+                } catch (e: UserNotFoundException) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse(404, e.message ?: "User not found"))
+                }
+            } catch (e: Exception) { 
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, e.message ?: "An unexpected error occurred"))
+            }
+        }
     }
 }
