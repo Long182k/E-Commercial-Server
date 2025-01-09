@@ -6,9 +6,8 @@ import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import java.sql.Connection
 
-fun Application.configureRouting() {
+fun Application.configureRouting(userService: UserService) {
     val dbConnection: Connection = connectToPostgres(embedded = false)
-    val userService = UserService(dbConnection)
     val categoryService = CategoryService(dbConnection)
     val productService = ProductService(dbConnection)
     val cartService = CartService(dbConnection, productService)

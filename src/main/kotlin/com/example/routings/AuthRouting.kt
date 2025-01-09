@@ -7,6 +7,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import com.example.services.EmailSendException
 
 fun Route.authRouting(userService: UserService) {
     route("/auth") {
@@ -70,6 +71,29 @@ fun Route.authRouting(userService: UserService) {
                     call.respond(HttpStatusCode.NotFound, ErrorResponse(404, e.message ?: "User not found"))
                 }
             } catch (e: Exception) { 
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, e.message ?: "An unexpected error occurred"))
+            }
+        }
+
+        post("/forgot-password") {
+            try {
+                val rawBody = call.receiveText()
+                val request = Json.decodeFromString<ForgotPasswordRequest>(rawBody)
+
+                if (request.email.isBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, "Email is required"))
+                    return@post
+                }
+
+                try {
+                    userService.forgotPassword(request.email)
+                    call.respond(HttpStatusCode.OK, SuccessResponse("Password reset email sent", true))
+                } catch (e: UserNotFoundException) {
+                    call.respond(HttpStatusCode.NotFound, ErrorResponse(404, e.message ?: "User not found"))
+                } catch (e: EmailSendException) {
+                    call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, e.message ?: "Failed to send reset email"))
+                }
+            } catch (e: Exception) {
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, e.message ?: "An unexpected error occurred"))
             }
         }

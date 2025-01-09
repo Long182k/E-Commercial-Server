@@ -12,9 +12,7 @@ import io.ktor.util.*
 import com.example.models.LoginRequest
 import com.example.models.UserService
 
-fun Application.configureSecurity() {
-    val userService = UserService(connectToPostgres(embedded = false))  // Assume UserService is properly set up
-
+fun Application.configureSecurity(userService: UserService) {
     authentication {
         basic("auth-basic") {
             realm = "Ktor Server"
