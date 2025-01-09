@@ -44,7 +44,8 @@ data class UserResponse(
     val id: Int,
     val username: String,
     val email: String,
-    val name: String
+    val name: String,
+    val avatarUrl: String?
 )
 
 @Serializable
@@ -152,7 +153,8 @@ class UserService(
                     id = userId,
                     username = user.name,
                     email = user.email,
-                    name = user.name
+                    name = user.name,
+                    avatarUrl = null
                 )
             }
         } catch (e: Exception) {
@@ -181,7 +183,8 @@ class UserService(
                         id = resultSet.getInt("id"),
                         username = resultSet.getString("username"),
                         email = resultSet.getString("email"),
-                        name = resultSet.getString("name")
+                        name = resultSet.getString("name"),
+                        avatarUrl = resultSet.getString("avatar_url")
                     )
                     return@withContext user
                 } else {

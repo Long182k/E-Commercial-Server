@@ -203,7 +203,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /auth/profile:
+  /auth/edit-profile:
     put:
       tags:
         - Authentication
@@ -217,12 +217,15 @@ paths:
               required:
                 - name
                 - email
+                - avatarUrl
               properties:
                 name:
                   type: string
                 email:
                   type: string
                   format: email
+                avatarUrl:
+                  type: string
       responses:
         "200":
           description: Profile updated successfully
