@@ -13,7 +13,8 @@ postgres:
   password: 3uCPOueUN0TAVV4B
 
 mailersend:
-  apiKey: "mmlsn.289b28c1e4bf731671f0655fbf275e0c967be398c9ce426b673fb3258d534faa"
+  apiKey: "mlsn.289b28c1e4bf731671f0655fbf275e0c967be398c9ce426b673fb3258d534faa"
+  senderEmail: "MS_K4Gazr@trial-x2p0347d7zy4zdrn.mlsender.net"
 
 cloudinary:
   cloudName: "dcivdqyyj"

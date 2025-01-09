@@ -21,7 +21,10 @@ fun Application.module() {
         apiKey = environment.config.property("cloudinary.apiKey").getString(),
         apiSecret = environment.config.property("cloudinary.apiSecret").getString()
     )
-    val emailService = EmailService(environment.config.property("mailersend.apiKey").getString())
+    val emailService = EmailService(
+        apiKey = environment.config.property("mailersend.apiKey").getString(),
+        senderEmail = environment.config.property("mailersend.senderEmail").getString()
+    )
     val userService = UserService(dbConnection, emailService)
     
     configureSecurity(userService)

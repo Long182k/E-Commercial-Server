@@ -24,7 +24,10 @@ private data class EmailRequestSimple(
     data class ToEmail(val email: String)
 }
 
-class EmailService(private val apiKey: String) {
+class EmailService(
+    private val apiKey: String,
+    private val senderEmail: String
+) {
     private val baseUrl = "https://api.mailersend.com/v1"
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -34,12 +37,12 @@ class EmailService(private val apiKey: String) {
 
     suspend fun sendPasswordResetEmail(toEmail: String, newPassword: String) {
         try {
-            println("Sending password reset email to: $toEmail")
-            println("New password: $newPassword")
-            
+            println("apiKey: $apiKey")
+            println("senderEmail: $senderEmail")
+
             val emailRequest = EmailRequestSimple(
                 from = EmailRequestSimple.FromEmail(
-                    email = "MS_K4Gazr@trial-x2p0347d7zy4zdrn.mlsender.net"
+                    email = senderEmail
                 ),
                 to = listOf(
                     EmailRequestSimple.ToEmail(email = toEmail)
@@ -59,20 +62,18 @@ class EmailService(private val apiKey: String) {
             )
 
             val response = client.post("$baseUrl/email") {
-                header("Authorization", "Bearer mlsn.289b28c1e4bf731671f0655fbf275e0c967be398c9ce426b673fb3258d534faa")
+                header("Authorization", "Bearer $apiKey")
                 header("Content-Type", "application/json")
                 header("X-Requested-With", "XMLHttpRequest")
                 setBody(emailRequest)   
             }
 
-            println("Email sendPasswordResetEmail response: $response")
 
             if (response.status != HttpStatusCode.Accepted) {
                 throw EmailSendException("Failed to send email: ${response.status}")
             }
 
         } catch (e: Exception) {
-            println("Error sending email: ${e.message}")
             throw EmailSendException("Failed to send email: ${e.message}")
         }
     }
