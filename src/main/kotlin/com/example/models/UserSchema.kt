@@ -52,6 +52,21 @@ data class ForgotPasswordRequest(
     val email: String
 )
 
+@Serializable
+data class EditProfileRequest(
+    val name: String,
+    val avatarUrl: String? = null
+)
+
+@Serializable
+data class UserProfileResponse(
+    val id: Int,
+    val username: String,
+    val email: String,
+    val name: String,
+    val avatarUrl: String?
+)
+
 class UserService(
     private val connection: Connection,
     private val emailService: EmailService
@@ -63,7 +78,8 @@ class UserService(
         USERNAME VARCHAR(255) UNIQUE,
         EMAIL VARCHAR(255) UNIQUE,
         PASSWORD VARCHAR(255),
-        NAME VARCHAR(255)
+        NAME VARCHAR(255),
+        AVATAR_URL TEXT
     );
 """
 
@@ -95,6 +111,12 @@ class UserService(
         private const val UPDATE_PASSWORD_BY_EMAIL = """
             UPDATE users SET password = ? 
             WHERE email = ?
+        """
+        private const val UPDATE_USER_PROFILE = """
+            UPDATE users 
+            SET name = ?, avatar_url = COALESCE(?, avatar_url)
+            WHERE email = ?
+            RETURNING id, username, email, name, avatar_url
         """
     }
 
@@ -249,6 +271,41 @@ class UserService(
                 is IllegalArgumentException -> throw e
                 is UserNotFoundException -> throw e
                 else -> throw Exception("Password reset failed: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun updateProfile(email: String, request: EditProfileRequest): UserProfileResponse = withContext(Dispatchers.IO) {
+        try {
+            println("Updating profile for email: $email")
+            println("Request: $request")
+            if (request.name.isBlank()) {
+                throw IllegalArgumentException("Name cannot be empty")
+            }
+
+            connection.prepareStatement(UPDATE_USER_PROFILE).use { statement ->
+                statement.setString(1, request.name)
+                statement.setString(2, request.avatarUrl)
+                statement.setString(3, email)
+
+                val resultSet = statement.executeQuery()
+                if (resultSet.next()) {
+                    return@withContext UserProfileResponse(
+                        id = resultSet.getInt("id"),
+                        username = resultSet.getString("username"),
+                        email = resultSet.getString("email"),
+                        name = resultSet.getString("name"),
+                        avatarUrl = resultSet.getString("avatar_url")
+                    )
+                } else {
+                    throw UserNotFoundException("User not found")
+                }
+            }
+        } catch (e: Exception) {
+            when (e) {
+                is IllegalArgumentException -> throw e
+                is UserNotFoundException -> throw e
+                else -> throw Exception("Profile update failed: ${e.message}")
             }
         }
     }

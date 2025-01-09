@@ -14,3 +14,8 @@ postgres:
 
 mailersend:
   apiKey: "mmlsn.289b28c1e4bf731671f0655fbf275e0c967be398c9ce426b673fb3258d534faa"
+
+cloudinary:
+  cloudName: "dcivdqyyj"
+  apiKey: "823514258534269"
+  apiSecret: "V9i9FinmZEBxl9wN_APF3h7X2TI"
