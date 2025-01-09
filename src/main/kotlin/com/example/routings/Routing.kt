@@ -5,18 +5,20 @@ import com.example.models.*
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import java.sql.Connection
+import com.example.services.CloudinaryService
 
-fun Application.configureRouting() {
+fun Application.configureRouting(
+    userService: UserService,
+    cloudinaryService: CloudinaryService
+) {
     val dbConnection: Connection = connectToPostgres(embedded = false)
-    val userService = UserService(dbConnection)
     val categoryService = CategoryService(dbConnection)
     val productService = ProductService(dbConnection)
     val cartService = CartService(dbConnection, productService)
     val orderService = OrderService(dbConnection, cartService, productService)
 
-
     routing {
-        authRouting(userService)
+        authRouting(userService, cloudinaryService)
         categoryRouting(categoryService)
         productRouting(productService)
         cartRouting(cartService)

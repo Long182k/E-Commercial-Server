@@ -1,4 +1,3 @@
-
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor)
@@ -20,7 +19,7 @@ application {
 repositories {
     mavenCentral()
     google()
-
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
@@ -45,5 +44,9 @@ dependencies {
     implementation ("io.ktor:ktor-serialization-jackson:2.3.0")
     implementation("io.ktor:ktor-server-swagger:2.3.0")
     implementation("io.ktor:ktor-server-openapi:2.3.0")
-
+    implementation("io.ktor:ktor-client-core:2.3.4")
+    implementation("io.ktor:ktor-client-cio:2.3.4")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.4")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.4")
+    implementation("com.cloudinary:cloudinary-http44:1.33.0")
 }
