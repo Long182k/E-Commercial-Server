@@ -104,7 +104,7 @@ fun Route.authRouting(
             }
         }
 
-        put("/profile") {
+        put("/edit-profile") {
             try {
                 val multipart = call.receiveMultipart()
                 var name = ""
