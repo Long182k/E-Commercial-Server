@@ -163,7 +163,14 @@ class OrderService(
                 throw Exception("Cart is empty")
             }
 
-            connection.prepareStatement(INSERT_ORDER).use { statement ->
+            var orderId: Int
+            var orderDate: String
+
+            connection.prepareStatement("""
+                INSERT INTO orders (user_id, subtotal, shipping, tax, discount, total_amount, status, order_date) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) 
+                RETURNING id, order_date
+            """).use { statement ->
                 statement.setInt(1, userId)
                 statement.setDouble(2, checkoutSummary.data.subtotal)
                 statement.setDouble(3, checkoutSummary.data.shipping)
@@ -173,45 +180,50 @@ class OrderService(
                 statement.setString(7, "PENDING")
 
                 val resultSet = statement.executeQuery()
-                resultSet.next()
-                val orderId = resultSet.getInt("id")
-
-                // Insert address
-                createAddress(orderId, address)
-
-                // Insert order items and update sell numbers
-                cartItems.forEach { cartItem ->
-                    productService.updateProductSellNumber(cartItem.productId, cartItem.quantity)
-                    insertOrderItem(orderId, cartItem)
+                if (resultSet.next()) {
+                    orderId = resultSet.getInt("id")
+                    orderDate = resultSet.getString("order_date")
+                } else {
+                    throw Exception("Failed to create order")
                 }
-
-                // Clear the user's cart after successful order placement
-                cartService.clearCart(userId)
-
-                // Get user email and send confirmation
-                connection.prepareStatement("SELECT email,name FROM users WHERE id = ?").use { emailStatement ->
-                    emailStatement.setInt(1, userId)
-                    val emailResult = emailStatement.executeQuery()
-                    if (emailResult.next()) {
-                        val userEmail = emailResult.getString("email")
-                        val userName = emailResult.getString("name")
-                        emailService.sendOrderConfirmationEmail(
-                            recipientEmail = userEmail,
-                            recipientName = userName,
-                            orderNumber = orderId.toString(),
-                            address = address,
-                            items = cartItems,
-                            subtotal = checkoutSummary.data.subtotal,
-                            shipping = checkoutSummary.data.shipping,
-                            tax = checkoutSummary.data.tax,
-                            discount = checkoutSummary.data.discount,
-                            total = checkoutSummary.data.total
-                        )
-                    }
-                }
-
-                return@withContext orderId
             }
+
+            // Insert address
+            createAddress(orderId, address)
+
+            // Insert order items and update sell numbers
+            cartItems.forEach { cartItem ->
+                productService.updateProductSellNumber(cartItem.productId, cartItem.quantity)
+                insertOrderItem(orderId, cartItem)
+            }
+
+            // Clear the user's cart after successful order placement
+            cartService.clearCart(userId)
+
+            // Get user email and send confirmation
+            connection.prepareStatement("SELECT email,name FROM users WHERE id = ?").use { emailStatement ->
+                emailStatement.setInt(1, userId)
+                val emailResult = emailStatement.executeQuery()
+                if (emailResult.next()) {
+                    val userEmail = emailResult.getString("email")
+                    val userName = emailResult.getString("name")
+                    emailService.sendOrderConfirmationEmail(
+                        recipientEmail = userEmail,
+                        recipientName = userName,
+                        orderNumber = orderId.toString(),
+                        orderDate = orderDate,
+                        address = address,
+                        items = cartItems,
+                        subtotal = checkoutSummary.data.subtotal,
+                        shipping = checkoutSummary.data.shipping,
+                        tax = checkoutSummary.data.tax,
+                        discount = checkoutSummary.data.discount,
+                        total = checkoutSummary.data.total
+                    )
+                }
+            }
+
+            return@withContext orderId
         } catch (e: Exception) {
             throw Exception("Failed to place order: ${e.message}")
         }

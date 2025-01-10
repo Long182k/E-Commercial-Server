@@ -10,6 +10,9 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.client.engine.cio.*
 import kotlinx.serialization.Serializable
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 
 @Serializable
 private data class EmailRequestSimple(
@@ -34,6 +37,20 @@ class EmailService(
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json()
+        }
+    }
+
+    private fun formatOrderDate(dateString: String?): String {
+        return try {
+            dateString?.let {
+                val inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")
+                val outputFormatter = DateTimeFormatter.ofPattern("HH:mm - dd/MM/yyyy")
+                
+                val dateTime = LocalDateTime.parse(dateString, inputFormatter)
+                dateTime.format(outputFormatter)
+            } ?: "N/A"
+        } catch (e: DateTimeParseException) {
+            dateString ?: "N/A"
         }
     }
 
@@ -136,6 +153,7 @@ class EmailService(
         recipientEmail: String,
         recipientName: String,
         orderNumber: String,
+        orderDate: String,
         address: Address,
         items: List<CartItemResponse>,
         subtotal: Double,
@@ -237,7 +255,9 @@ class EmailService(
                     
                     <div style="text-align: center; padding: 20px 0; background-color: #f8f9fa; border-radius: 8px; margin-bottom: 20px;">
                         <h2 style="color: #2196F3; margin: 0; font-size: 24px;">Order Confirmation</h2>
-                        <p style="color: #666; margin: 10px 0 0;">Order #$orderNumber</p>
+                        <p style="color: #666; margin: 5px 0 0; font-size: 14px;">
+                            ${formatOrderDate(orderDate)}
+                        </p>
                     </div>
 
                     <div style="margin-bottom: 20px;">
@@ -287,7 +307,18 @@ class EmailService(
                 from = EmailRequestSimple.FromEmail(email = senderEmail),
                 to = listOf(EmailRequestSimple.ToEmail(email = recipientEmail)),
                 subject = "JetECommerce - Order Confirmation",
-                text = createPlainTextVersion(recipientName, orderNumber, address, items, subtotal, shipping, tax, discount, total),
+                text = createPlainTextVersion(
+                    recipientName = recipientName,
+                    orderNumber = orderNumber,
+                    orderDate = orderDate,
+                    address = address,
+                    items = items,
+                    subtotal = subtotal,
+                    shipping = shipping,
+                    tax = tax,
+                    discount = discount,
+                    total = total
+                ),
                 html = htmlBody
             )
 
@@ -309,6 +340,7 @@ class EmailService(
     private fun createPlainTextVersion(
         recipientName: String,
         orderNumber: String,
+        orderDate: String,
         address: Address,
         items: List<CartItemResponse>,
         subtotal: Double,
@@ -328,7 +360,8 @@ class EmailService(
 
             Thank you for shopping with JetECommerce! We're pleased to confirm that we've received your order and it's being processed.
 
-            Order Confirmation #$orderNumber
+            Order Confirmation
+            Date: ${formatOrderDate(orderDate)}
 
             Shipping Address:
             ${address.addressLine}
