@@ -33,6 +33,10 @@ data class OrderResponse(
     val items: List<OrderItemResponse>,
     val orderDate: String? = null,
     val status: String,
+    val subtotal: Double,
+    val shipping: Double,
+    val tax: Double,
+    val discount: Double,
     val totalAmount: Double,
     val userId: Int,
     val address: Address,
@@ -126,18 +130,19 @@ class OrderService(
         """
 
         private const val SELECT_ORDERS_BY_USER = """
-        SELECT 
-            o.id, o.user_id, o.total_amount, o.status, o.order_date,
-            a.id as address_id, a.address_line, a.city, a.state, a.postal_code, a.country,
-            oi.id as order_item_id, oi.product_id, oi.quantity, oi.price,
-            p.title as product_name
-        FROM orders o
-        LEFT JOIN addresses a ON o.id = a.order_id
-        LEFT JOIN order_items oi ON o.id = oi.order_id
-        LEFT JOIN products p ON oi.product_id = p.id
-        WHERE o.user_id = ?
-        ORDER BY o.order_date DESC
-    """
+            SELECT 
+                o.id, o.user_id, o.subtotal, o.shipping, o.tax, o.discount, o.total_amount, 
+                o.status, o.order_date,
+                a.id as address_id, a.address_line, a.city, a.state, a.postal_code, a.country,
+                oi.id as order_item_id, oi.product_id, oi.quantity, oi.price,
+                p.title as product_name
+            FROM orders o
+            LEFT JOIN addresses a ON o.id = a.order_id
+            LEFT JOIN order_items oi ON o.id = oi.order_id
+            LEFT JOIN products p ON oi.product_id = p.id
+            WHERE o.user_id = ?
+            ORDER BY o.order_date DESC
+        """
     }
 
     init {
@@ -158,7 +163,14 @@ class OrderService(
                 throw Exception("Cart is empty")
             }
 
-            connection.prepareStatement(INSERT_ORDER).use { statement ->
+            var orderId: Int
+            var orderDate: String
+
+            connection.prepareStatement("""
+                INSERT INTO orders (user_id, subtotal, shipping, tax, discount, total_amount, status, order_date) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) 
+                RETURNING id, order_date
+            """).use { statement ->
                 statement.setInt(1, userId)
                 statement.setDouble(2, checkoutSummary.data.subtotal)
                 statement.setDouble(3, checkoutSummary.data.shipping)
@@ -168,45 +180,50 @@ class OrderService(
                 statement.setString(7, "PENDING")
 
                 val resultSet = statement.executeQuery()
-                resultSet.next()
-                val orderId = resultSet.getInt("id")
-
-                // Insert address
-                createAddress(orderId, address)
-
-                // Insert order items and update sell numbers
-                cartItems.forEach { cartItem ->
-                    productService.updateProductSellNumber(cartItem.productId, cartItem.quantity)
-                    insertOrderItem(orderId, cartItem)
+                if (resultSet.next()) {
+                    orderId = resultSet.getInt("id")
+                    orderDate = resultSet.getString("order_date")
+                } else {
+                    throw Exception("Failed to create order")
                 }
-
-                // Clear the user's cart after successful order placement
-                cartService.clearCart(userId)
-
-                // Get user email and send confirmation
-                connection.prepareStatement("SELECT email,name FROM users WHERE id = ?").use { emailStatement ->
-                    emailStatement.setInt(1, userId)
-                    val emailResult = emailStatement.executeQuery()
-                    if (emailResult.next()) {
-                        val userEmail = emailResult.getString("email")
-                        val userName = emailResult.getString("name")
-                        emailService.sendOrderConfirmationEmail(
-                            recipientEmail = userEmail,
-                            recipientName = userName,
-                            orderNumber = orderId.toString(),
-                            address = address,
-                            items = cartItems,
-                            subtotal = checkoutSummary.data.subtotal,
-                            shipping = checkoutSummary.data.shipping,
-                            tax = checkoutSummary.data.tax,
-                            discount = checkoutSummary.data.discount,
-                            total = checkoutSummary.data.total
-                        )
-                    }
-                }
-
-                return@withContext orderId
             }
+
+            // Insert address
+            createAddress(orderId, address)
+
+            // Insert order items and update sell numbers
+            cartItems.forEach { cartItem ->
+                productService.updateProductSellNumber(cartItem.productId, cartItem.quantity)
+                insertOrderItem(orderId, cartItem)
+            }
+
+            // Clear the user's cart after successful order placement
+            cartService.clearCart(userId)
+
+            // Get user email and send confirmation
+            connection.prepareStatement("SELECT email,name FROM users WHERE id = ?").use { emailStatement ->
+                emailStatement.setInt(1, userId)
+                val emailResult = emailStatement.executeQuery()
+                if (emailResult.next()) {
+                    val userEmail = emailResult.getString("email")
+                    val userName = emailResult.getString("name")
+                    emailService.sendOrderConfirmationEmail(
+                        recipientEmail = userEmail,
+                        recipientName = userName,
+                        orderNumber = orderId.toString(),
+                        orderDate = orderDate,
+                        address = address,
+                        items = cartItems,
+                        subtotal = checkoutSummary.data.subtotal,
+                        shipping = checkoutSummary.data.shipping,
+                        tax = checkoutSummary.data.tax,
+                        discount = checkoutSummary.data.discount,
+                        total = checkoutSummary.data.total
+                    )
+                }
+            }
+
+            return@withContext orderId
         } catch (e: Exception) {
             throw Exception("Failed to place order: ${e.message}")
         }
@@ -276,7 +293,6 @@ class OrderService(
                                 country = resultSet.getString("country")
                             )
                         } else {
-                            // Provide a default address
                             Address(
                                 addressLine = "",
                                 city = "",
@@ -289,6 +305,10 @@ class OrderService(
                         orders[orderId] = OrderResponse(
                             id = orderId,
                             userId = resultSet.getInt("user_id"),
+                            subtotal = resultSet.getDouble("subtotal"),
+                            shipping = resultSet.getDouble("shipping"),
+                            tax = resultSet.getDouble("tax"),
+                            discount = resultSet.getDouble("discount"),
                             totalAmount = resultSet.getDouble("total_amount"),
                             status = resultSet.getString("status") ?: "UNKNOWN",
                             items = mutableListOf(),
@@ -310,7 +330,6 @@ class OrderService(
                             productName = resultSet.getString("product_name")
                         )
                         (orders[orderId]?.items as MutableList).add(orderItem)
-                        println("Added order item: $orderItem")
                     }
                 }
 
