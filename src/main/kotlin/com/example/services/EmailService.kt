@@ -37,43 +37,97 @@ class EmailService(
         }
     }
 
-    suspend fun sendPasswordResetEmail(toEmail: String, newPassword: String) {
-        try {
-
-            val emailRequest = EmailRequestSimple(
-                from = EmailRequestSimple.FromEmail(
-                    email = senderEmail
-                ),
-                to = listOf(
-                    EmailRequestSimple.ToEmail(email = toEmail)
-                ),
-                subject = "Password Reset",
-                text = """
-                    Your password has been reset.
-                    Your new password is: $newPassword
+    suspend fun sendPasswordResetEmail(
+        toEmail: String,
+        userName: String,
+        newPassword: String
+    ) {
+        val htmlBody = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>JetECommerce - Password Reset</title>
+            </head>
+            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #333; background-color: #f4f4f4;">
+                <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <img src="https://res.cloudinary.com/dcivdqyyj/image/upload/v1736505364/arqrqvoch2ihezsa5nxj.png"
+                             alt="JetECommerce"
+                             style="width: 200px; height: auto; margin-bottom: 10px;"
+                             onerror="this.style.display='none'">
+                    </div>
                     
-                    Please login and change your password immediately for security reasons.
-                """.trimIndent(),
-                html = """
-                    <p>Your password has been reset.</p>
-                    <p>Your new password is: <strong>$newPassword</strong></p>
-                    <p>Please login and change your password immediately for security reasons.</p>
-                """.trimIndent()
+                    <div style="text-align: center; padding: 20px 0; background-color: #f8f9fa; border-radius: 8px; margin-bottom: 20px;">
+                        <h2 style="color: #2196F3; margin: 0; font-size: 24px;">Password Reset</h2>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <p style="margin: 0; font-size: 16px;">Dear ${userName.capitalize()},</p>
+                        <p style="margin: 10px 0 0; color: #666; line-height: 1.5;">
+                            We received a request to reset your password for your JetECommerce account. Your new password has been generated:
+                        </p>
+                    </div>
+
+                    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                        <p style="font-family: monospace; font-size: 24px; margin: 0; color: #2196F3; font-weight: bold;">
+                            $newPassword
+                        </p>
+                    </div>
+
+                    <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                        <p style="margin: 0; color: #856404; line-height: 1.5;">
+                            <strong>Important:</strong> For security reasons, please log in and change your password immediately.
+                        </p>
+                    </div>
+
+                    <div style="text-align: center; padding: 20px 0; border-top: 2px solid #eee;">
+                        <p style="color: #666; margin: 0;">Thank you for using JetECommerce!</p>
+                        <p style="color: #666; margin: 10px 0 0; font-size: 12px;">
+                            If you didn't request this password reset, please contact our support team immediately at support@jetecommerce.com
+                        </p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        """.trimIndent()
+
+        val plainText = """
+            JetECommerce
+            
+            Dear ${userName.capitalize()},
+
+            We received a request to reset your password for your JetECommerce account.
+            Your new password is: $newPassword
+
+            Important: For security reasons, please log in and change your password immediately.
+
+            If you didn't request this password reset, please contact our support team immediately at support@jetecommerce.com
+
+            Thank you for using JetECommerce!
+        """.trimIndent()
+
+        try {
+            val emailRequest = EmailRequestSimple(
+                from = EmailRequestSimple.FromEmail(email = senderEmail),
+                to = listOf(EmailRequestSimple.ToEmail(email = toEmail)),
+                subject = "JetECommerce - Password Reset",
+                text = plainText,
+                html = htmlBody
             )
 
             val response = client.post("$baseUrl/email") {
                 header("Authorization", "Bearer $apiKey")
                 header("Content-Type", "application/json")
                 header("X-Requested-With", "XMLHttpRequest")
-                setBody(emailRequest)   
+                setBody(emailRequest)
             }
-
 
             if (response.status != HttpStatusCode.Accepted) {
                 throw EmailSendException("Failed to send email: ${response.status}")
             }
-
-        } catch (e: Exception) {    
+        } catch (e: Exception) {
             throw EmailSendException("Failed to send email: ${e.message}")
         }
     }
@@ -184,7 +238,7 @@ class EmailService(
             val emailRequest = EmailRequestSimple(
                 from = EmailRequestSimple.FromEmail(email = senderEmail),
                 to = listOf(EmailRequestSimple.ToEmail(email = recipientEmail)),
-                subject = "Order Confirmation #$orderNumber",
+                subject = "JetECommerce - Order Confirmation #$orderNumber",
                 text = createPlainTextVersion(recipientName, orderNumber, address, items, total),
                 html = htmlBody
             )

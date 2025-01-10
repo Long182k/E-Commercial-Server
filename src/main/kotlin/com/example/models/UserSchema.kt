@@ -237,50 +237,44 @@ class UserService(
         }
     }
 
-    suspend fun forgotPassword(email: String) = withContext(Dispatchers.IO) {
-        try {
-            println("Forgot password request received for email: $email")
-            // Validate email
-            if (email.isBlank() || !isValidEmail(email)) {
-                throw IllegalArgumentException("Invalid email format")
-            }
+    suspend fun forgotPassword(email: String): String {
 
-            // Check if user exists
-            if (!checkEmailExists(email)) {
-                throw UserNotFoundException("User not found")
-            }
+        // Validate email
+        if (email.isBlank() || !isValidEmail(email)) {
+            throw IllegalArgumentException("Invalid email format")
+        }
 
-            // Generate new password
-            val newPassword = generateRandomPassword()
-            println("Generated new password: $newPassword")
-            // Update password in database
-            connection.prepareStatement(UPDATE_PASSWORD_BY_EMAIL).use { statement ->
-                statement.setString(1, newPassword)
-                statement.setString(2, email)
+        // Check if user exists
+        if (!checkEmailExists(email)) {
+            throw UserNotFoundException("User not found")
+        }
+
+        val newPassword = generateRandomPassword()
+        
+        connection.prepareStatement("SELECT name FROM users WHERE email = ?").use { statement ->
+            statement.setString(1, email)
+            val result = statement.executeQuery()
+            if (result.next()) {
+                val userName = result.getString("name")
                 
-                val updatedRows = statement.executeUpdate()
-                if (updatedRows == 0) {
-                    println("Failed to update password")
-                    throw Exception("Failed to update password")
+                // Update password in database
+                connection.prepareStatement("UPDATE users SET password = ? WHERE email = ?").use { updateStatement ->
+                    updateStatement.setString(1, newPassword)
+                    updateStatement.setString(2, email)
+                    updateStatement.executeUpdate()
                 }
-
-                // Send email with new password
-                emailService.sendPasswordResetEmail(email, newPassword)
-                return@withContext true
-            }
-        } catch (e: Exception) {
-            when (e) {
-                is IllegalArgumentException -> throw e
-                is UserNotFoundException -> throw e
-                else -> throw Exception("Password reset failed: ${e.message}")
+                
+                // Send reset password email with user's name
+                emailService.sendPasswordResetEmail(email, userName, newPassword)
+                return "Password reset email sent"
+            } else {
+                throw Exception("Email not found")
             }
         }
     }
 
     suspend fun updateProfile(email: String, request: EditProfileRequest): UserProfileResponse = withContext(Dispatchers.IO) {
         try {
-            println("Updating profile for email: $email")
-            println("Request: $request")
             if (request.name.isBlank()) {
                 throw IllegalArgumentException("Name cannot be empty")
             }
