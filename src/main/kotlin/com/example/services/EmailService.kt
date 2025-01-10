@@ -286,7 +286,7 @@ class EmailService(
             val emailRequest = EmailRequestSimple(
                 from = EmailRequestSimple.FromEmail(email = senderEmail),
                 to = listOf(EmailRequestSimple.ToEmail(email = recipientEmail)),
-                subject = "JetECommerce - Order Confirmation #$orderNumber",
+                subject = "JetECommerce - Order Confirmation",
                 text = createPlainTextVersion(recipientName, orderNumber, address, items, subtotal, shipping, tax, discount, total),
                 html = htmlBody
             )
