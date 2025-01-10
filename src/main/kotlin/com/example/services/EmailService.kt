@@ -37,8 +37,6 @@ class EmailService(
 
     suspend fun sendPasswordResetEmail(toEmail: String, newPassword: String) {
         try {
-            println("apiKey: $apiKey")
-            println("senderEmail: $senderEmail")
 
             val emailRequest = EmailRequestSimple(
                 from = EmailRequestSimple.FromEmail(

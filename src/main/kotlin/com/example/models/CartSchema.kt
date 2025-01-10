@@ -70,7 +70,6 @@ class CartService(private val connection: Connection, private val productService
     init {
         connection.createStatement().use { statement ->
             statement.execute(CREATE_TABLE_CART)
-            println("Cart table created or verified successfully")
         }
     }
 
@@ -125,14 +124,12 @@ class CartService(private val connection: Connection, private val productService
 
     suspend fun getCartByUserId(userId: Int): List<CartItemResponse> = withContext(Dispatchers.IO) {
         try {
-            println("Fetching cart for userId: $userId")
             connection.prepareStatement(SELECT_CART_BY_USER).use { statement ->
                 statement.setInt(1, userId)
                 val resultSet = statement.executeQuery()
                 val cartItems = mutableListOf<CartItemResponse>()
 
                 while (resultSet.next()) {
-                    println("Processing row...")
                     try {
                         val item = CartItemResponse(
                             id = resultSet.getInt("id"),
@@ -144,16 +141,13 @@ class CartService(private val connection: Connection, private val productService
                             productName = resultSet.getString("product_name")
                         )
                         cartItems.add(item)
-                        println("Added item to cart: $item")
                     } catch (e: Exception) {
                         println("Error processing row: ${e.message}")
                     }
                 }
-                println("Final cart items count: ${cartItems.size}")
                 return@withContext cartItems
             }
         } catch (e: Exception) {
-            println("Error fetching cart: ${e.message}")
             throw Exception("Failed to get cart items: ${e.message}")
         }
     }
@@ -202,6 +196,13 @@ class CartService(private val connection: Connection, private val productService
                 is CartItemNotFoundException -> throw e
                 else -> throw Exception("Failed to delete cart item: ${e.message}")
             }
+        }
+    }
+
+    suspend fun clearCart(userId: Int) {
+        connection.prepareStatement("DELETE FROM cart WHERE user_id = ?").use { statement ->
+            statement.setInt(1, userId)
+            statement.executeUpdate()
         }
     }
 }

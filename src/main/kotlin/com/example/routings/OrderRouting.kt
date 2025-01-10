@@ -23,7 +23,6 @@ fun Route.orderRouting(orderService: OrderService) {
                     call.respond(HttpStatusCode.BadRequest, ErrorResponse(400, e.message ?: "Failed to place order"))
                 }
             } catch (e: Exception) {
-                println("ezzzzzzzz: ${e}")
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse(500, "An unexpected error occurred"))
             }
         }

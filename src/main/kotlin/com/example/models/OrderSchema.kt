@@ -181,6 +181,9 @@ class OrderService(
                     insertOrderItem(orderId, cartItem)
                 }
 
+                // Clear the user's cart after successful order placement
+                cartService.clearCart(userId)
+
                 return@withContext orderId
             }
         } catch (e: Exception) {
