@@ -7,15 +7,7 @@ import java.util.UUID
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.sql.Statement
-
-@Serializable
-data class Address(
-    val addressLine: String,
-    val city: String,
-    val state: String,
-    val postalCode: String,
-    val country: String
-)
+import com.example.services.EmailService
 
 @Serializable
 data class OrderItem(
@@ -76,13 +68,18 @@ data class CheckoutResponse(
 class OrderService(
     private val connection: Connection,
     private val cartService: CartService,
-    private val productService: ProductService
+    private val productService: ProductService,
+    private val emailService: EmailService
 ) {
     companion object {
         private const val CREATE_TABLE_ORDERS = """
             CREATE TABLE IF NOT EXISTS ORDERS (
                 ID SERIAL PRIMARY KEY,
                 USER_ID INT REFERENCES USERS(ID),
+                SUBTOTAL DECIMAL(10,2) NOT NULL,
+                SHIPPING DECIMAL(10,2) NOT NULL,
+                TAX DECIMAL(10,2) NOT NULL,
+                DISCOUNT DECIMAL(10,2) NOT NULL,
                 TOTAL_AMOUNT DECIMAL(10,2) NOT NULL,
                 STATUS VARCHAR(50) NOT NULL,
                 ORDER_DATE TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -112,8 +109,8 @@ class OrderService(
         """
 
         private const val INSERT_ORDER = """
-            INSERT INTO orders (user_id, total_amount, status, order_date) 
-            VALUES (?, ?, ?, CURRENT_TIMESTAMP) 
+            INSERT INTO orders (user_id, subtotal, shipping, tax, discount, total_amount, status, order_date) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) 
             RETURNING id
         """
 
@@ -153,19 +150,22 @@ class OrderService(
 
     suspend fun placeOrder(userId: Int, address: Address): Int = withContext(Dispatchers.IO) {
         try {
-            // Get cart items
-            val cartItems = cartService.getCartByUserId(userId)
+            // Get cart items and cost breakdown
+            val checkoutSummary = getCheckoutSummary(userId)
+            val cartItems = checkoutSummary.data.items
+            
             if (cartItems.isEmpty()) {
                 throw Exception("Cart is empty")
             }
 
-            // Calculate total
-            val total = cartItems.sumOf { it.price * it.quantity }
-
             connection.prepareStatement(INSERT_ORDER).use { statement ->
                 statement.setInt(1, userId)
-                statement.setDouble(2, total)
-                statement.setString(3, "PENDING")
+                statement.setDouble(2, checkoutSummary.data.subtotal)
+                statement.setDouble(3, checkoutSummary.data.shipping)
+                statement.setDouble(4, checkoutSummary.data.tax)
+                statement.setDouble(5, checkoutSummary.data.discount)
+                statement.setDouble(6, checkoutSummary.data.total)
+                statement.setString(7, "PENDING")
 
                 val resultSet = statement.executeQuery()
                 resultSet.next()
@@ -175,10 +175,34 @@ class OrderService(
                 createAddress(orderId, address)
 
                 // Insert order items and update sell numbers
-                val orderItems = cartItems.map { cartItem ->
-                    // Update sell number for each product
+                cartItems.forEach { cartItem ->
                     productService.updateProductSellNumber(cartItem.productId, cartItem.quantity)
                     insertOrderItem(orderId, cartItem)
+                }
+
+                // Clear the user's cart after successful order placement
+                cartService.clearCart(userId)
+
+                // Get user email and send confirmation
+                connection.prepareStatement("SELECT email,name FROM users WHERE id = ?").use { emailStatement ->
+                    emailStatement.setInt(1, userId)
+                    val emailResult = emailStatement.executeQuery()
+                    if (emailResult.next()) {
+                        val userEmail = emailResult.getString("email")
+                        val userName = emailResult.getString("name")
+                        emailService.sendOrderConfirmationEmail(
+                            recipientEmail = userEmail,
+                            recipientName = userName,
+                            orderNumber = orderId.toString(),
+                            address = address,
+                            items = cartItems,
+                            subtotal = checkoutSummary.data.subtotal,
+                            shipping = checkoutSummary.data.shipping,
+                            tax = checkoutSummary.data.tax,
+                            discount = checkoutSummary.data.discount,
+                            total = checkoutSummary.data.total
+                        )
+                    }
                 }
 
                 return@withContext orderId
