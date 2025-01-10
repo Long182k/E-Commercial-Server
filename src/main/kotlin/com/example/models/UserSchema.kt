@@ -266,7 +266,6 @@ class UserService(
 
                 // Send email with new password
                 emailService.sendPasswordResetEmail(email, newPassword)
-                println("Email sent successfully")
                 return@withContext true
             }
         } catch (e: Exception) {

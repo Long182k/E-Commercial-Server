@@ -7,15 +7,7 @@ import java.util.UUID
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.sql.Statement
-
-@Serializable
-data class Address(
-    val addressLine: String,
-    val city: String,
-    val state: String,
-    val postalCode: String,
-    val country: String
-)
+import com.example.services.EmailService
 
 @Serializable
 data class OrderItem(
@@ -76,7 +68,8 @@ data class CheckoutResponse(
 class OrderService(
     private val connection: Connection,
     private val cartService: CartService,
-    private val productService: ProductService
+    private val productService: ProductService,
+    private val emailService: EmailService
 ) {
     companion object {
         private const val CREATE_TABLE_ORDERS = """
@@ -183,6 +176,24 @@ class OrderService(
 
                 // Clear the user's cart after successful order placement
                 cartService.clearCart(userId)
+
+                // Get user email and send confirmation
+                connection.prepareStatement("SELECT email,name FROM users WHERE id = ?").use { emailStatement ->
+                    emailStatement.setInt(1, userId)
+                    val emailResult = emailStatement.executeQuery()
+                    if (emailResult.next()) {
+                        val userEmail = emailResult.getString("email")
+                        val userName = emailResult.getString("name")
+                        emailService.sendOrderConfirmationEmail(
+                            recipientEmail = userEmail,
+                            recipientName = userName,
+                            orderNumber = orderId.toString(),
+                            address = address,
+                            items = cartItems,
+                            total = total
+                        )
+                    }
+                }
 
                 return@withContext orderId
             }

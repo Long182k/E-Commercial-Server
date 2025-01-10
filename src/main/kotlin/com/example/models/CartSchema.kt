@@ -10,17 +10,6 @@ data class CartItem(
     val quantity: Int
 )
 
-@Serializable
-data class CartItemResponse(
-    val id: Int,
-    val productId: Int,
-    val userId: Int,
-    val price: Double,
-    val imageUrl: String,
-    val quantity: Int,
-    val productName: String
-)
-
 class CartService(private val connection: Connection, private val productService: ProductService) {
     companion object {
         private const val CREATE_TABLE_CART = """
