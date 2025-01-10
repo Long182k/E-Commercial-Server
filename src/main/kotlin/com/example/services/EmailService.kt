@@ -138,6 +138,10 @@ class EmailService(
         orderNumber: String,
         address: Address,
         items: List<CartItemResponse>,
+        subtotal: Double,
+        shipping: Double,
+        tax: Double,
+        discount: Double,
         total: Double
     ) {
         val itemsHtml = items.joinToString("") { item ->
@@ -166,6 +170,53 @@ class EmailService(
             </tr>
             """
         }
+
+        val costBreakdownHtml = """
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr>
+                    <td style="text-align: right; padding: 8px 8px;">
+                        <span style="color: #666;">Subtotal 🛒</span>
+                    </td>
+                    <td style="text-align: right; padding: 8px 0; width: 100px;">
+                        $${String.format("%.2f", subtotal)}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: right; padding: 8px 8px;">
+                        <span style="color: #666;">Shipping 🚚</span>
+                    </td>
+                    <td style="text-align: right; padding: 8px 0; width: 100px;">
+                        $${String.format("%.2f", shipping)}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="text-align: right; padding: 8px 8px;">
+                        <span style="color: #666;">Tax 💰</span>
+                    </td>
+                    <td style="text-align: right; padding: 8px 0; width: 100px;">
+                        $${String.format("%.2f", tax)}
+                    </td>
+                </tr>
+                ${if (discount > 0) """
+                    <tr>
+                        <td style="text-align: right; padding: 8px 8px;">
+                            <span style="color: #666;">Discount 🏷️</span>
+                        </td>
+                        <td style="text-align: right; padding: 8px 0; width: 100px; color: #2196F3;">
+                            -$${String.format("%.2f", discount)}
+                        </td>
+                    </tr>
+                """ else ""}
+                <tr>
+                    <td style="text-align: right; padding: 8px 8px; font-weight: bold; border-top: 2px solid #eee;">
+                        <span>Total 💵</span>
+                    </td>
+                    <td style="text-align: right; padding: 8px 0; width: 100px; font-weight: bold; border-top: 2px solid #eee;">
+                        $${String.format("%.2f", total)}
+                    </td>
+                </tr>
+            </table>
+        """
 
         val htmlBody = """
             <!DOCTYPE html>
@@ -205,23 +256,20 @@ class EmailService(
                         </p>
                     </div>
 
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
                         <thead>
                             <tr style="background-color: #f8f9fa;">
                                 <th style="padding: 12px; text-align: left; border-bottom: 2px solid #eee;">Product</th>
-                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #eee; white-space: nowrap;">Quantity</th>
-                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #eee; white-space: nowrap;">Price</th>
-                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #eee; white-space: nowrap;">Subtotal</th>
+                                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #eee;">Quantity</th>
+                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #eee;">Price</th>
+                                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #eee;">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody>
                             $itemsHtml
-                            <tr>
-                                <td colspan="3" style="padding: 12px; text-align: right; font-weight: bold; border-top: 2px solid #eee;">Total:</td>
-                                <td style="padding: 12px; text-align: right; font-weight: bold; border-top: 2px solid #eee;">$${String.format("%.2f", total)}</td>
-                            </tr>
                         </tbody>
                     </table>
+                    $costBreakdownHtml
 
                     <div style="text-align: center; padding: 20px 0; border-top: 2px solid #eee;">
                         <p style="color: #666; margin: 0;">Thank you for shopping with JetECommerce, ${recipientName.capitalize()}!</p>
@@ -239,7 +287,7 @@ class EmailService(
                 from = EmailRequestSimple.FromEmail(email = senderEmail),
                 to = listOf(EmailRequestSimple.ToEmail(email = recipientEmail)),
                 subject = "JetECommerce - Order Confirmation #$orderNumber",
-                text = createPlainTextVersion(recipientName, orderNumber, address, items, total),
+                text = createPlainTextVersion(recipientName, orderNumber, address, items, subtotal, shipping, tax, discount, total),
                 html = htmlBody
             )
 
@@ -263,6 +311,10 @@ class EmailService(
         orderNumber: String,
         address: Address,
         items: List<CartItemResponse>,
+        subtotal: Double,
+        shipping: Double,
+        tax: Double,
+        discount: Double,
         total: Double
     ): String {
         val itemsList = items.joinToString("\n") { item ->
@@ -286,6 +338,11 @@ class EmailService(
             Items:
             $itemsList
 
+            Order Summary:
+            Subtotal: $${String.format("%.2f", subtotal)}
+            Shipping: $${String.format("%.2f", shipping)}
+            Tax: $${String.format("%.2f", tax)}
+            ${if (discount > 0) "Discount: -$${String.format("%.2f", discount)}\n" else ""}
             Total: $${String.format("%.2f", total)}
 
             Thank you for shopping with JetECommerce!
