@@ -33,6 +33,10 @@ data class OrderResponse(
     val items: List<OrderItemResponse>,
     val orderDate: String? = null,
     val status: String,
+    val subtotal: Double,
+    val shipping: Double,
+    val tax: Double,
+    val discount: Double,
     val totalAmount: Double,
     val userId: Int,
     val address: Address,
@@ -126,18 +130,19 @@ class OrderService(
         """
 
         private const val SELECT_ORDERS_BY_USER = """
-        SELECT 
-            o.id, o.user_id, o.total_amount, o.status, o.order_date,
-            a.id as address_id, a.address_line, a.city, a.state, a.postal_code, a.country,
-            oi.id as order_item_id, oi.product_id, oi.quantity, oi.price,
-            p.title as product_name
-        FROM orders o
-        LEFT JOIN addresses a ON o.id = a.order_id
-        LEFT JOIN order_items oi ON o.id = oi.order_id
-        LEFT JOIN products p ON oi.product_id = p.id
-        WHERE o.user_id = ?
-        ORDER BY o.order_date DESC
-    """
+            SELECT 
+                o.id, o.user_id, o.subtotal, o.shipping, o.tax, o.discount, o.total_amount, 
+                o.status, o.order_date,
+                a.id as address_id, a.address_line, a.city, a.state, a.postal_code, a.country,
+                oi.id as order_item_id, oi.product_id, oi.quantity, oi.price,
+                p.title as product_name
+            FROM orders o
+            LEFT JOIN addresses a ON o.id = a.order_id
+            LEFT JOIN order_items oi ON o.id = oi.order_id
+            LEFT JOIN products p ON oi.product_id = p.id
+            WHERE o.user_id = ?
+            ORDER BY o.order_date DESC
+        """
     }
 
     init {
@@ -276,7 +281,6 @@ class OrderService(
                                 country = resultSet.getString("country")
                             )
                         } else {
-                            // Provide a default address
                             Address(
                                 addressLine = "",
                                 city = "",
@@ -289,6 +293,10 @@ class OrderService(
                         orders[orderId] = OrderResponse(
                             id = orderId,
                             userId = resultSet.getInt("user_id"),
+                            subtotal = resultSet.getDouble("subtotal"),
+                            shipping = resultSet.getDouble("shipping"),
+                            tax = resultSet.getDouble("tax"),
+                            discount = resultSet.getDouble("discount"),
                             totalAmount = resultSet.getDouble("total_amount"),
                             status = resultSet.getString("status") ?: "UNKNOWN",
                             items = mutableListOf(),
@@ -310,7 +318,6 @@ class OrderService(
                             productName = resultSet.getString("product_name")
                         )
                         (orders[orderId]?.items as MutableList).add(orderItem)
-                        println("Added order item: $orderItem")
                     }
                 }
 
