@@ -130,7 +130,7 @@ class OrderService(
         """
 
         private const val SELECT_ORDERS_BY_USER = """
-            SELECT 
+            SELECT DISTINCT
                 o.id, o.user_id, o.subtotal, o.shipping, o.tax, o.discount, o.total_amount, 
                 o.status, o.order_date,
                 a.id as address_id, a.address_line, a.city, a.state, a.postal_code, a.country,
@@ -274,6 +274,7 @@ class OrderService(
                 statement.setInt(1, userId)
                 val resultSet = statement.executeQuery()
                 val orders = mutableMapOf<Int, OrderResponse>()
+                val processedOrderItems = mutableSetOf<Int>()
 
                 while (resultSet.next()) {
                     val orderId = resultSet.getInt("id")
@@ -317,19 +318,20 @@ class OrderService(
                         )
                     }
                     
-                    // Add order item if it exists
-                    val productId = resultSet.getInt("product_id")
-                    if (!resultSet.wasNull()) {
+                    // Add order item if it exists and hasn't been processed
+                    val orderItemId = resultSet.getInt("order_item_id")
+                    if (!resultSet.wasNull() && !processedOrderItems.contains(orderItemId)) {
                         val orderItem = OrderItemResponse(
-                            id = resultSet.getInt("order_item_id"),
+                            id = orderItemId,
                             orderId = orderId,
-                            productId = productId,
+                            productId = resultSet.getInt("product_id"),
                             quantity = resultSet.getInt("quantity"),
                             price = resultSet.getDouble("price"),
                             userId = resultSet.getInt("user_id"),
                             productName = resultSet.getString("product_name")
                         )
                         (orders[orderId]?.items as MutableList).add(orderItem)
+                        processedOrderItems.add(orderItemId)
                     }
                 }
 
