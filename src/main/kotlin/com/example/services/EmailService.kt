@@ -40,20 +40,6 @@ class EmailService(
         }
     }
 
-    private fun formatOrderDate(dateString: String?): String {
-        return try {
-            dateString?.let {
-                val inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")
-                val outputFormatter = DateTimeFormatter.ofPattern("HH:mm - dd/MM/yyyy")
-                
-                val dateTime = LocalDateTime.parse(dateString, inputFormatter)
-                dateTime.format(outputFormatter)
-            } ?: "N/A"
-        } catch (e: DateTimeParseException) {
-            dateString ?: "N/A"
-        }
-    }
-
     suspend fun sendPasswordResetEmail(
         toEmail: String,
         userName: String,
@@ -381,6 +367,20 @@ class EmailService(
             Thank you for shopping with JetECommerce!
             If you have any questions about your order, please contact our support team at support@jetecommerce.com
         """.trimIndent()
+    }
+}
+
+private fun formatOrderDate(dateString: String?): String {
+    return try {
+        dateString?.let {
+            val inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")
+            val outputFormatter = DateTimeFormatter.ofPattern("HH:mm - dd/MM/yyyy")
+            
+            val dateTime = LocalDateTime.parse(dateString, inputFormatter)
+            dateTime.format(outputFormatter)
+        } ?: "N/A"
+    } catch (e: DateTimeParseException) {
+        dateString ?: "N/A"
     }
 }
 
